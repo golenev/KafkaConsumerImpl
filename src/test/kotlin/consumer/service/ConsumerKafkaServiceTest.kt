@@ -1,6 +1,9 @@
 package consumer.service
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import org.apache.kafka.clients.admin.AdminClient
+import org.apache.kafka.clients.admin.AdminClientConfig
+import org.apache.kafka.clients.admin.NewTopic
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
@@ -34,7 +37,7 @@ class ConsumerKafkaServiceTest {
     @Test
     fun `assign mode consumes messages by key`() {
         val topic = "assign-${UUID.randomUUID()}"
-        kafka.createTopic(topic)
+        createTopic(topic)
 
         val cfg = createBaseConfig(topic).apply {
             groupId = null
@@ -55,7 +58,7 @@ class ConsumerKafkaServiceTest {
     @Test
     fun `subscribe mode with group id consumes new messages`() {
         val topic = "group-${UUID.randomUUID()}"
-        kafka.createTopic(topic)
+        createTopic(topic)
 
         val cfg = createBaseConfig(topic).apply {
             groupId = "gid-${UUID.randomUUID()}"
@@ -75,7 +78,7 @@ class ConsumerKafkaServiceTest {
     @Test
     fun `subscribe mode with group id prefix replays last N records`() {
         val topic = "prefix-${UUID.randomUUID()}"
-        kafka.createTopic(topic)
+        createTopic(topic)
 
         produce(
             topic,
@@ -126,6 +129,17 @@ class ConsumerKafkaServiceTest {
                 val json = mapper.writeValueAsString(payload)
                 producer.send(ProducerRecord(topic, payload.id, json)).get()
             }
+        }
+    }
+
+    private fun createTopic(topic: String, partitions: Int = 1, replicationFactor: Short = 1) {
+        val props = Properties().apply {
+            put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.bootstrapServers)
+        }
+
+        AdminClient.create(props).use { adminClient ->
+            val newTopic = NewTopic(topic, partitions, replicationFactor)
+            adminClient.createTopics(listOf(newTopic)).all().get()
         }
     }
 
