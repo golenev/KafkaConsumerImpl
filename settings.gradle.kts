@@ -6,3 +6,4 @@ pluginManagement {
 }
 
 rootProject.name = "KafkaConsumerImpl"
+include("worker-integration-tests")
