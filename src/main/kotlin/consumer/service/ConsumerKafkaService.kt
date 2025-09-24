@@ -129,7 +129,8 @@ class ConsumerKafkaService<T : Any>(
 
     /**
      * Останавливает цикл чтения из Kafka и завершает поток.
-     * Повторные вызовы игнорируются.
+     * `consumer.wakeup()` прерывает блокирующий `poll`, а `AtomicBoolean` гарантирует
+     * идемпотентность остановки и видимость состояния между потоками.
      */
     private fun stop() {
         if (!isRunningNow.getAndSet(false)) return
