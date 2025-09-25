@@ -9,6 +9,8 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
 import java.util.UUID
@@ -37,6 +39,8 @@ class WorkerTestEnvironment(
         .withNetwork(network)
         .withNetworkAliases(kafkaAlias)
 
+    private val workerJar: Path = resolveWorkerJar()
+
     private val workerImage: ImageFromDockerfile = ImageFromDockerfile()
         .withDockerfileFromBuilder { builder ->
             builder
@@ -48,7 +52,7 @@ class WorkerTestEnvironment(
         }
         .withFileFromPath(
             "app/worker.jar",
-            Paths.get("worker-integration-tests", "build", "libs", "worker-app-all.jar")
+            workerJar
         )
 
     private val worker: GenericContainer<*> = GenericContainer(workerImage)
@@ -128,5 +132,18 @@ class WorkerTestEnvironment(
         const val TOPIC_NAME: String = "worker_events"
         private const val KAFKA_INTERNAL_PORT: Int = 9092
         private const val WORKER_INTERNAL_PORT: Int = 18_080
+    }
+
+    private fun resolveWorkerJar(): Path {
+        val candidates = listOf(
+            Paths.get("worker-integration-tests", "build", "libs", "worker-app-all.jar"),
+            Paths.get("build", "libs", "worker-app-all.jar")
+        ).map { it.toAbsolutePath().normalize() }
+
+        val existing = candidates.firstOrNull { Files.exists(it) }
+        require(existing != null) {
+            "Fat jar worker-app-all.jar is missing. Run :worker-integration-tests:shadowJar before executing the tests."
+        }
+        return existing
     }
 }
