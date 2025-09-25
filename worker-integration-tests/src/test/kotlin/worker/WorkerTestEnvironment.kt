@@ -42,7 +42,7 @@ class WorkerTestEnvironment(
             builder
                 .from("eclipse-temurin:17-jre")
                 .copy("app/worker.jar", "/app/worker.jar")
-                .expose(8080)
+                .expose(WORKER_INTERNAL_PORT)
                 .entryPoint("java", "-jar", "/app/worker.jar")
                 .build()
         }
@@ -53,9 +53,10 @@ class WorkerTestEnvironment(
 
     private val worker: GenericContainer<*> = GenericContainer(workerImage)
         .withNetwork(network)
-        .withExposedPorts(8080)
+        .withExposedPorts(WORKER_INTERNAL_PORT)
         .withEnv("KAFKA_BOOTSTRAP_SERVERS", kafkaBootstrapServersForWorker())
         .withEnv("TOPIC_NAME", TOPIC_NAME)
+        .withEnv("PORT", WORKER_INTERNAL_PORT.toString())
         .waitingFor(
             org.testcontainers.containers.wait.strategy.Wait
                 .forHttp("/readyz")
@@ -110,7 +111,7 @@ class WorkerTestEnvironment(
     }
 
     private fun workerUri(path: String): URI {
-        val port = worker.getMappedPort(8080)
+        val port = worker.getMappedPort(WORKER_INTERNAL_PORT)
         return URI.create("http://${worker.host}:$port$path")
     }
 
@@ -120,13 +121,12 @@ class WorkerTestEnvironment(
      * Строим строку вручную, сохраняя схему листенера.
      */
     private fun kafkaBootstrapServersForWorker(): String {
-        val listener = kafka.bootstrapServers.substringBefore("://", missingDelimiterValue = "PLAINTEXT")
-        val scheme = if (listener.isBlank()) "PLAINTEXT" else listener
-        return "$scheme://$kafkaAlias:$KAFKA_INTERNAL_PORT"
+        return "PLAINTEXT://$kafkaAlias:$KAFKA_INTERNAL_PORT"
     }
 
     companion object {
         const val TOPIC_NAME: String = "worker_events"
         private const val KAFKA_INTERNAL_PORT: Int = 9092
+        private const val WORKER_INTERNAL_PORT: Int = 18_080
     }
 }
