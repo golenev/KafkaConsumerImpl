@@ -15,6 +15,7 @@ repositories {
 val jacksonVersion = "2.17.2"
 val ktorVersion = "2.3.12"
 val testcontainersVersion = "1.19.7"
+val kafkaClientsVersion = "3.7.0"
 
 dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:$jacksonVersion")
@@ -25,6 +26,8 @@ dependencies {
     implementation("io.ktor:ktor-server-netty-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
     implementation("io.ktor:ktor-serialization-jackson-jvm:$ktorVersion")
+
+    implementation("org.apache.kafka:kafka-clients:$kafkaClientsVersion")
 
     implementation("org.slf4j:slf4j-api:2.0.16")
     runtimeOnly("ch.qos.logback:logback-classic:1.5.6")
