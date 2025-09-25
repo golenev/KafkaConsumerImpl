@@ -3,6 +3,7 @@ package worker
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import consumer.service.ConsumerKafkaConfig
+import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.net.URI
 import java.net.http.HttpClient
@@ -14,6 +15,7 @@ import java.util.UUID
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.KafkaContainer
 import org.testcontainers.containers.Network
+import org.testcontainers.containers.output.Slf4jLogConsumer
 import org.testcontainers.images.builder.ImageFromDockerfile
 import org.testcontainers.utility.DockerImageName
 
@@ -27,12 +29,13 @@ class WorkerTestEnvironment(
 ) : Closeable {
 
     private val network: Network = Network.newNetwork()
+    private val kafkaAlias = "kafka"
 
     private val kafka: KafkaContainer = KafkaContainer(
         DockerImageName.parse("confluentinc/cp-kafka:7.5.3")
     )
         .withNetwork(network)
-        .withNetworkAliases("kafka")
+        .withNetworkAliases(kafkaAlias)
 
     private val workerImage: ImageFromDockerfile = ImageFromDockerfile()
         .withDockerfileFromBuilder { builder ->
@@ -51,7 +54,7 @@ class WorkerTestEnvironment(
     private val worker: GenericContainer<*> = GenericContainer(workerImage)
         .withNetwork(network)
         .withExposedPorts(8080)
-        .withEnv("KAFKA_BOOTSTRAP_SERVERS", "PLAINTEXT://kafka:9092")
+        .withEnv("KAFKA_BOOTSTRAP_SERVERS", kafkaBootstrapServersForWorker())
         .withEnv("TOPIC_NAME", TOPIC_NAME)
         .waitingFor(
             org.testcontainers.containers.wait.strategy.Wait
@@ -59,6 +62,7 @@ class WorkerTestEnvironment(
                 .forStatusCode(200)
                 .withStartupTimeout(Duration.ofSeconds(60))
         )
+        .withLogConsumer(Slf4jLogConsumer(LoggerFactory.getLogger("worker-container")))
 
     private val httpClient: HttpClient = HttpClient.newHttpClient()
 
@@ -110,7 +114,19 @@ class WorkerTestEnvironment(
         return URI.create("http://${worker.host}:$port$path")
     }
 
+    /**
+     * KafkaContainer отдаёт bootstrap для хоста (PLAINTEXT://localhost:...),
+     * а внутри сети Testcontainers сервисам нужен адрес по network alias.
+     * Строим строку вручную, сохраняя схему листенера.
+     */
+    private fun kafkaBootstrapServersForWorker(): String {
+        val listener = kafka.bootstrapServers.substringBefore("://", missingDelimiterValue = "PLAINTEXT")
+        val scheme = if (listener.isBlank()) "PLAINTEXT" else listener
+        return "$scheme://$kafkaAlias:$KAFKA_INTERNAL_PORT"
+    }
+
     companion object {
         const val TOPIC_NAME: String = "worker_events"
+        private const val KAFKA_INTERNAL_PORT: Int = 9092
     }
 }
