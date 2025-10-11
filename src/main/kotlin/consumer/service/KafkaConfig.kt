@@ -5,8 +5,8 @@ import java.util.*
 
 open class KafkaConfig(
     protected val bootstrapServers: String,
-    protected val username: String,
-    protected val password: String,
+    protected val username: String?,
+    protected val password: String?,
 ) {
     private val JAAS_SCRAM_MODULE =
         "org.apache.kafka.common.security.scram.ScramLoginModule"
@@ -22,23 +22,31 @@ open class KafkaConfig(
         }
 
     var jaasModule: String = JAAS_SCRAM_MODULE
-    var securityProtocol: String = "SASL_PLAINTEXT"
+    var securityProtocol: String = "PLAINTEXT"
 
     open fun toProperties(): Properties = Properties().apply {
         put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
 
-        if (saslMechanism == "PLAIN" && jaasModule != JAAS_PLAIN_MODULE) {
-            jaasModule = JAAS_PLAIN_MODULE
-        } else if (
-            (saslMechanism == "SCRAM-SHA-256" || saslMechanism == "SCRAM-SHA-512")
-            && jaasModule != JAAS_SCRAM_MODULE
-        ) {
-            jaasModule = JAAS_SCRAM_MODULE
+        val hasCredentials = !username.isNullOrBlank() && !password.isNullOrBlank()
+
+        if (hasCredentials) {
+            if (saslMechanism == "PLAIN" && jaasModule != JAAS_PLAIN_MODULE) {
+                jaasModule = JAAS_PLAIN_MODULE
+            } else if (
+                (saslMechanism == "SCRAM-SHA-256" || saslMechanism == "SCRAM-SHA-512")
+                && jaasModule != JAAS_SCRAM_MODULE
+            ) {
+                jaasModule = JAAS_SCRAM_MODULE
+            }
+
+            put(
+                "sasl.jaas.config",
+                """$jaasModule required username=\"$username\" password=\"$password\";"""
+            )
+            put("sasl.mechanism", saslMechanism)
         }
 
-        put("sasl.jaas.config", """$jaasModule required username="$username" password="$password";""")
         put("security.protocol", securityProtocol)
-        put("sasl.mechanism", saslMechanism)
     }
 
 }
