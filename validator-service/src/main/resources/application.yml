@@ -3,7 +3,7 @@ server:
 
 validator:
   kafka:
-    bootstrap-servers: ${VALIDATOR_KAFKA_BOOTSTRAP:localhost:8817}
+    bootstrap-servers: ${VALIDATOR_KAFKA_BOOTSTRAP:localhost:9092}
     group-id-prefix: validator-
     auto-offset-reset: earliest
     concurrency: 3

@@ -17,7 +17,7 @@ data class ValidatorTopicsProperties(
 
 @ConfigurationProperties("validator.kafka")
 data class ValidatorKafkaProperties(
-    @DefaultValue("localhost:8817")
+    @DefaultValue("localhost:9092")
     val bootstrapServers: String,
     val username: String? = null,
     val password: String? = null,

@@ -2,48 +2,43 @@
 
 Этот репозиторий содержит Spring Boot сервис (`validator-service`), который валидирует
 входящие события Kafka и публикует обогащённые сообщения в выходной топик.
-Ниже приведена последовательность действий для запуска сервиса вместе с
-Redpanda из локального `docker-compose`.
+Ниже описаны шаги по подготовке инфраструктуры и запуску приложения.
 
 ## Предварительные требования
 
-- Docker и Docker Compose
+- Kafka-брокер с доступом к админским утилитам (`kafka-topics.sh`, `kafka-console-consumer.sh` и т.п.)
 - JDK 21+
+- Gradle Wrapper (поставляется в репозитории)
 - Терминал с Unix-инструментами (Bash)
 
-## 1. Запустите инфраструктуру Kafka
+## 1. Подготовьте инфраструктуру Kafka
 
-Из корня проекта поднимите Redpanda и Redpanda Console:
-
-```bash
-docker compose up -d
-```
-
-Compose-файл пробрасывает Kafka-листенер на `localhost:8817`, а веб-интерфейс
-консоли — на `http://localhost:8055`. Брокер автоматически создаёт топики
-`in_validator` и `out_validator`, а также настраивает SCRAM-учётные данные:
-
-- **Логин:** `validator_user`
-- **Пароль:** `validator_pass`
-- **Механизм SASL:** `SCRAM-SHA-256`
-
-При необходимости можно посмотреть логи запуска:
+Убедитесь, что Kafka-брокер запущен и доступен. Создайте входной и выходной топики
+с несколькими партициями (например, по 3) и фактором репликации, подходящим для
+вашего окружения:
 
 ```bash
-docker compose logs -f redpanda
+kafka-topics.sh --bootstrap-server localhost:9092 --create \
+  --topic in_validator --partitions 3 --replication-factor 1
+
+kafka-topics.sh --bootstrap-server localhost:9092 --create \
+  --topic out_validator --partitions 3 --replication-factor 1
 ```
+
+Если требуется аутентификация, заранее подготовьте пользователя/пароль или другой
+механизм безопасности и убедитесь, что он имеет права на оба топика.
 
 ## 2. Экспортируйте параметры подключения Kafka
 
-Сервис читает конфигурацию Kafka из переменных окружения. Для встроенного
-стека Redpanda выполните следующие команды перед запуском приложения:
+Сервис читает конфигурацию Kafka из переменных окружения. Ниже приведён пример для
+локального брокера без SASL:
 
 ```bash
-export VALIDATOR_KAFKA_BOOTSTRAP=localhost:8817
-export VALIDATOR_KAFKA_SECURITY_PROTOCOL=SASL_PLAINTEXT
-export VALIDATOR_KAFKA_SASL_MECHANISM=SCRAM-SHA-256
-export VALIDATOR_KAFKA_USERNAME=validator_user
-export VALIDATOR_KAFKA_PASSWORD=validator_pass
+export VALIDATOR_KAFKA_BOOTSTRAP=localhost:9092
+export VALIDATOR_KAFKA_SECURITY_PROTOCOL=PLAINTEXT
+export VALIDATOR_KAFKA_SASL_MECHANISM=
+export VALIDATOR_KAFKA_USERNAME=
+export VALIDATOR_KAFKA_PASSWORD=
 ```
 
 При необходимости можно переопределить другие свойства `validator.kafka.*`,
@@ -51,7 +46,7 @@ export VALIDATOR_KAFKA_PASSWORD=validator_pass
 
 ## 3. Запустите Spring Boot сервис
 
-Используйте Gradle wrapper для старта приложения:
+Используйте Gradle Wrapper для старта приложения:
 
 ```bash
 ./gradlew :validator-service:bootRun
@@ -85,22 +80,25 @@ curl -X POST http://localhost:8085/api/v1/validation \
       }'
 ```
 
-Если `type_action == 100`, сервис добавляет отметку времени и публикует
-сообщение в топик `out_validator`. В остальных случаях он пишет предупреждение
-в лог и завершает обработку.
+Если `type_action == 100`, сервис добавляет отметку времени и публикует сообщение
+в топик `out_validator`. В остальных случаях он пишет предупреждение в лог и
+завершает обработку.
 
 ## 5. Проверьте содержимое выходного топика
 
-Откройте Redpanda Console по адресу `http://localhost:8055`, авторизуйтесь с
-указанными выше учётными данными и найдите топик `out_validator`, чтобы
-убедиться в публикации валидированного события.
-
-## 6. Остановите окружение
-
-Остановите Spring Boot сервис (Ctrl+C), затем завершите работу Docker-сервисов:
+Для проверки результата можно воспользоваться стандартными утилитами Kafka.
+Например, чтобы прочитать одно сообщение из `out_validator`:
 
 ```bash
-docker compose down
+kafka-console-consumer.sh --bootstrap-server localhost:9092 \
+  --topic out_validator --from-beginning --max-messages 1
 ```
 
-Эта команда остановит Redpanda и веб-консоль.
+Либо используйте любой другой инструмент наблюдения за Kafka, доступный в вашем
+окружении.
+
+## 6. Остановите сервис
+
+Остановите Spring Boot приложение сочетанием `Ctrl+C` (если оно запущено через
+`bootRun`) либо завершите процесс JAR. После этого при необходимости отключите
+Kafka-брокер штатными средствами.

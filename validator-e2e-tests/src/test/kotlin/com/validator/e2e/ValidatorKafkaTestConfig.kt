@@ -44,7 +44,7 @@ data class ValidatorKafkaSettings(
 }
 
 fun loadValidatorKafkaSettings(): ValidatorKafkaSettings {
-    val bootstrapServers = envOrDefault("VALIDATOR_KAFKA_BOOTSTRAP", "localhost:8817")
+    val bootstrapServers = envOrDefault("VALIDATOR_KAFKA_BOOTSTRAP", "localhost:9092")
     val inputTopic = envOrDefault("VALIDATOR_TOPIC_INPUT", "in_validator")
     val outputTopic = envOrDefault("VALIDATOR_TOPIC_OUTPUT", "out_validator")
     val securityProtocol = envOrNull("VALIDATOR_KAFKA_SECURITY_PROTOCOL")
