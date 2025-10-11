@@ -5,13 +5,9 @@ import java.util.*
 
 open class KafkaConfig(
     protected val bootstrapServers: String,
-    protected val username: String,
-    protected val password: String,
+    protected val username: String?,
+    protected val password: String?,
 ) {
-    init {
-        require(username.isNotBlank()) { "Kafka username must not be blank" }
-        require(password.isNotBlank()) { "Kafka password must not be blank" }
-    }
 
     private val JAAS_SCRAM_MODULE =
         "org.apache.kafka.common.security.scram.ScramLoginModule"
@@ -41,12 +37,35 @@ open class KafkaConfig(
             jaasModule = JAAS_SCRAM_MODULE
         }
 
+        val sanitizedUsername = username?.takeUnless { it.isBlank() }
+        val sanitizedPassword = password?.takeUnless { it.isBlank() }
+
         if (securityProtocol.uppercase().startsWith("SASL")) {
+            val (user, pass) = when {
+                sanitizedUsername == null && sanitizedPassword == null ->
+                    throw IllegalStateException(
+                        "Для security.protocol=$securityProtocol необходимо задать логин и пароль Kafka"
+                    )
+
+                sanitizedUsername == null || sanitizedPassword == null ->
+                    throw IllegalStateException(
+                        "Нужно одновременно указать validator.kafka.username и validator.kafka.password"
+                    )
+
+                else -> sanitizedUsername to sanitizedPassword
+            }
+
             put(
                 "sasl.jaas.config",
-                """$jaasModule required username=\"${escape(username)}\" password=\"${escape(password)}\";"""
+                """$jaasModule required username=\"${escape(user)}\" password=\"${escape(pass)}\";"""
             )
             put("sasl.mechanism", saslMechanism)
+        } else if (sanitizedUsername != null || sanitizedPassword != null) {
+            if (sanitizedUsername == null || sanitizedPassword == null) {
+                throw IllegalStateException(
+                    "Нужно одновременно указать validator.kafka.username и validator.kafka.password"
+                )
+            }
         }
 
         put("security.protocol", securityProtocol)

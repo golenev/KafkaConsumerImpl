@@ -7,8 +7,8 @@ import java.util.Properties
 
 class ProducerKafkaConfig(
     bootstrapServers: String,
-    username: String,
-    password: String,
+    username: String?,
+    password: String?,
 ) : KafkaConfig(bootstrapServers, username, password) {
 
     var clientId: String? = null

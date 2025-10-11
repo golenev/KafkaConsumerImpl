@@ -19,8 +19,8 @@ data class ValidatorTopicsProperties(
 data class ValidatorKafkaProperties(
     @DefaultValue("localhost:9092")
     val bootstrapServers: String,
-    val username: String,
-    val password: String,
+    val username: String? = null,
+    val password: String? = null,
     val securityProtocol: String? = null,
     val saslMechanism: String? = null,
     val groupId: String? = null,

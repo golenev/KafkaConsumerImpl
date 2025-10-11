@@ -4,8 +4,8 @@ server:
 validator:
   kafka:
     bootstrap-servers: ${VALIDATOR_KAFKA_BOOTSTRAP:localhost:9092}
-    username: ${VALIDATOR_KAFKA_USERNAME}
-    password: ${VALIDATOR_KAFKA_PASSWORD}
+    username: ${VALIDATOR_KAFKA_USERNAME:}
+    password: ${VALIDATOR_KAFKA_PASSWORD:}
     group-id-prefix: validator-
     auto-offset-reset: earliest
     concurrency: 3
