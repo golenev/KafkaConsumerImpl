@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   redpanda:
@@ -8,19 +8,19 @@ services:
       - bash
       - -c
       - |
-        redpanda start --overprovisioned --smp 1 --memory 1G --reserve-memory 0M --node-id 0 --check=false \
-          --kafka-addr PLAINTEXT://0.0.0.0:9092,PLAINTEXT://redpanda:9093 \
-          --advertise-kafka-addr PLAINTEXT://localhost:9092,PLAINTEXT://redpanda:9093 \
-          --pandaproxy-addr 0.0.0.0:8082 --advertise-pandaproxy-addr localhost:8082 \
-          --schema-registry-addr 0.0.0.0:8081 &
+        redpanda start --mode dev-container --smp 1 --memory 1G --overprovisioned --reserve-memory 0M \
+          --node-id 0 --check=false \
+          --kafka-addr PLAINTEXT://0.0.0.0:9092,PLAINTEXT://redpanda:9092 \
+          --advertise-kafka-addr PLAINTEXT://localhost:8817,PLAINTEXT://redpanda:9092 \
+          --set redpanda.enable_sasl=true &
         pid=$!
         until rpk cluster info --brokers localhost:9092 >/dev/null 2>&1; do sleep 1; done
+        rpk acl user create validator_user --password validator_pass --mechanism SCRAM-SHA-256 --brokers localhost:9092 || true
+        rpk acl create --allow-principal user:validator_user --operation all --topic out_validator --brokers localhost:9092 || true
         rpk topic create out_validator --brokers localhost:9092 --replicas 1 --partitions 3 || true
         wait ${pid}
     ports:
       - "8817:9092"
-      - "8081:8081"
-      - "8082:8082"
     environment:
       - RPK_CLUSTER_NAME=validator-cluster
     healthcheck:
@@ -30,15 +30,17 @@ services:
       retries: 5
 
   redpanda-console:
-    image: docker.redpanda.com/vectorized/console:v2.7.2
-    container_name: validator-redpanda-console
+    image: docker.redpanda.com/redpandadata/console:latest
+    container_name: redpanda-console
     depends_on:
       redpanda:
         condition: service_healthy
-    environment:
-      KAFKA_BROKERS: redpanda:9093
-      KAFKA_TLS_ENABLED: "false"
-      CONSOLE_LISTEN_ADDRESS: 0.0.0.0:8080
-      CONSOLE_DEFAULT_TOPIC: out_validator
     ports:
-      - "8080:8080"
+      - "8055:8080"
+    environment:
+      KAFKA_BROKERS: "redpanda:9092"
+      KAFKA_SASL_ENABLED: "true"
+      KAFKA_SASL_USERNAME: "validator_user"
+      KAFKA_SASL_PASSWORD: "validator_pass"
+      KAFKA_SASL_MECHANISM: "SCRAM-SHA-256"
+      CONSOLE_DEFAULT_TOPIC: out_validator
