@@ -20,8 +20,8 @@ docker compose up -d
 ```
 
 Compose-файл пробрасывает Kafka-листенер на `localhost:8817`, а веб-интерфейс
-консоли — на `http://localhost:8055`. Брокер автоматически создаёт топик
-`out_validator` и настраивает SCRAM-учётные данные:
+консоли — на `http://localhost:8055`. Брокер автоматически создаёт топики
+`in_validator` и `out_validator`, а также настраивает SCRAM-учётные данные:
 
 - **Логин:** `validator_user`
 - **Пароль:** `validator_pass`
