@@ -49,9 +49,29 @@ class WaitForMany<K, V> {
             )
             if (v != null) {
                 out.add(v)
-                if (out.size >= min) return out
+                log.debug(
+                    "Collected {} item(s) for key={} (required min={}, max={})",
+                    out.size,
+                    key,
+                    min,
+                    max
+                )
+                if (out.size >= min) {
+                    log.debug(
+                        "Minimum threshold reached for key={} -> returning {} item(s)",
+                        key,
+                        out.size
+                    )
+                    return out
+                }
             } else {
                 // ни одного нового элемента до истечения оставшегося времени
+                log.debug(
+                    "No new items for key={} before timeout; collected {}/{} so far",
+                    key,
+                    out.size,
+                    min
+                )
                 break
             }
         }

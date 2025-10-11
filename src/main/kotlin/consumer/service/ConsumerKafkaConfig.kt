@@ -7,8 +7,8 @@ import java.util.*
 
 class ConsumerKafkaConfig(
     bootstrapServers: String,
-    username: String? = null,
-    password: String? = null
+    username: String,
+    password: String
 ) : KafkaConfig(bootstrapServers, username, password) {
 
     // делаем публичными — чтобы можно было задавать снаружи

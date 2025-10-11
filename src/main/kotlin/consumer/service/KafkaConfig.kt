@@ -5,9 +5,14 @@ import java.util.*
 
 open class KafkaConfig(
     protected val bootstrapServers: String,
-    protected val username: String?,
-    protected val password: String?,
+    protected val username: String,
+    protected val password: String,
 ) {
+    init {
+        require(username.isNotBlank()) { "Kafka username must not be blank" }
+        require(password.isNotBlank()) { "Kafka password must not be blank" }
+    }
+
     private val JAAS_SCRAM_MODULE =
         "org.apache.kafka.common.security.scram.ScramLoginModule"
     private val JAAS_PLAIN_MODULE =
@@ -22,32 +27,33 @@ open class KafkaConfig(
         }
 
     var jaasModule: String = JAAS_SCRAM_MODULE
-    var securityProtocol: String = "PLAINTEXT"
+    var securityProtocol: String = "SASL_PLAINTEXT"
 
     open fun toProperties(): Properties = Properties().apply {
         put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
 
-        val hasCredentials = !username.isNullOrBlank() && !password.isNullOrBlank()
+        if (saslMechanism == "PLAIN" && jaasModule != JAAS_PLAIN_MODULE) {
+            jaasModule = JAAS_PLAIN_MODULE
+        } else if (
+            (saslMechanism == "SCRAM-SHA-256" || saslMechanism == "SCRAM-SHA-512")
+            && jaasModule != JAAS_SCRAM_MODULE
+        ) {
+            jaasModule = JAAS_SCRAM_MODULE
+        }
 
-        if (hasCredentials) {
-            if (saslMechanism == "PLAIN" && jaasModule != JAAS_PLAIN_MODULE) {
-                jaasModule = JAAS_PLAIN_MODULE
-            } else if (
-                (saslMechanism == "SCRAM-SHA-256" || saslMechanism == "SCRAM-SHA-512")
-                && jaasModule != JAAS_SCRAM_MODULE
-            ) {
-                jaasModule = JAAS_SCRAM_MODULE
-            }
-
+        if (securityProtocol.uppercase().startsWith("SASL")) {
             put(
                 "sasl.jaas.config",
-                """$jaasModule required username=\"$username\" password=\"$password\";"""
+                """$jaasModule required username=\"${escape(username)}\" password=\"${escape(password)}\";"""
             )
             put("sasl.mechanism", saslMechanism)
         }
 
         put("security.protocol", securityProtocol)
     }
+
+    private fun escape(value: String): String =
+        value.replace("\\", "\\\\").replace("\"", "\\\"")
 
 }
 

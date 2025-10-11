@@ -8,8 +8,8 @@ data class ValidatorKafkaSettings(
     val bootstrapServers: String,
     val inputTopic: String,
     val outputTopic: String,
-    val username: String?,
-    val password: String?,
+    val username: String,
+    val password: String,
     val securityProtocol: String,
     val saslMechanism: String,
 ) {
@@ -41,8 +41,8 @@ val validatorKafkaSettings = ValidatorKafkaSettings(
     bootstrapServers = "localhost:9092",
     inputTopic = "in_validator",
     outputTopic = "out_validator",
-    username = null,
-    password = null,
-    securityProtocol = "PLAINTEXT",
+    username = "validator-user",
+    password = "validator-password",
+    securityProtocol = "SASL_PLAINTEXT",
     saslMechanism = "SCRAM-SHA-256",
 )

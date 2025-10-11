@@ -4,9 +4,13 @@ server:
 validator:
   kafka:
     bootstrap-servers: ${VALIDATOR_KAFKA_BOOTSTRAP:localhost:9092}
+    username: ${VALIDATOR_KAFKA_USERNAME}
+    password: ${VALIDATOR_KAFKA_PASSWORD}
     group-id-prefix: validator-
     auto-offset-reset: earliest
     concurrency: 3
+    security-protocol: ${VALIDATOR_KAFKA_SECURITY_PROTOCOL:SASL_PLAINTEXT}
+    sasl-mechanism: ${VALIDATOR_KAFKA_SASL_MECHANISM:SCRAM-SHA-256}
   topics:
     input: in_validator
     output: out_validator

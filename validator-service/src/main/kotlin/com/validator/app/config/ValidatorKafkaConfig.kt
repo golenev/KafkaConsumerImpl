@@ -57,11 +57,10 @@ class ValidatorKafkaConfig {
             configs[CommonClientConfigs.SECURITY_PROTOCOL_CONFIG] = it
         }
 
-        if (kafkaProperties.username != null && kafkaProperties.password != null) {
-            configs[SaslConfigs.SASL_JAAS_CONFIG] = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"${kafkaProperties.username}\" password=\"${kafkaProperties.password}\";"
-            kafkaProperties.saslMechanism?.let { mechanism ->
-                configs[SaslConfigs.SASL_MECHANISM] = mechanism
-            }
+        val (username, password) = kafkaProperties.requireCredentials()
+        configs[SaslConfigs.SASL_JAAS_CONFIG] = kafkaProperties.buildJaasConfig(username, password)
+        kafkaProperties.saslMechanism?.let { mechanism ->
+            configs[SaslConfigs.SASL_MECHANISM] = mechanism
         }
 
         return KafkaAdmin(configs)
@@ -90,6 +89,8 @@ class ValidatorKafkaConfig {
     }
 
     private fun baseProducerProps(kafkaProperties: ValidatorKafkaProperties): Map<String, Any> {
+        val (username, password) = kafkaProperties.requireCredentials()
+
         return mutableMapOf<String, Any>(
             ProducerConfig.BOOTSTRAP_SERVERS_CONFIG to kafkaProperties.bootstrapServers,
             ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java,
@@ -99,10 +100,8 @@ class ValidatorKafkaConfig {
             kafkaProperties.securityProtocol?.let {
                 put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, it)
             }
-            if (kafkaProperties.username != null && kafkaProperties.password != null) {
-                put(SaslConfigs.SASL_JAAS_CONFIG, "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"${kafkaProperties.username}\" password=\"${kafkaProperties.password}\";")
-                kafkaProperties.saslMechanism?.let { put(SaslConfigs.SASL_MECHANISM, it) }
-            }
+            put(SaslConfigs.SASL_JAAS_CONFIG, kafkaProperties.buildJaasConfig(username, password))
+            kafkaProperties.saslMechanism?.let { put(SaslConfigs.SASL_MECHANISM, it) }
         }
     }
 
@@ -121,6 +120,8 @@ class ValidatorKafkaConfig {
         kafkaProperties: ValidatorKafkaProperties,
         objectMapper: ObjectMapper
     ): ConsumerFactory<String, ValidationPayload> {
+        val (username, password) = kafkaProperties.requireCredentials()
+
         val props = mutableMapOf<String, Any>(
             ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to kafkaProperties.bootstrapServers,
             ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG to StringDeserializer::class.java,
@@ -132,10 +133,8 @@ class ValidatorKafkaConfig {
         kafkaProperties.securityProtocol?.let {
             props[CommonClientConfigs.SECURITY_PROTOCOL_CONFIG] = it
         }
-        if (kafkaProperties.username != null && kafkaProperties.password != null) {
-            props[SaslConfigs.SASL_JAAS_CONFIG] = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"${kafkaProperties.username}\" password=\"${kafkaProperties.password}\";"
-            kafkaProperties.saslMechanism?.let { props[SaslConfigs.SASL_MECHANISM] = it }
-        }
+        props[SaslConfigs.SASL_JAAS_CONFIG] = kafkaProperties.buildJaasConfig(username, password)
+        kafkaProperties.saslMechanism?.let { props[SaslConfigs.SASL_MECHANISM] = it }
 
         when {
             kafkaProperties.groupIdPrefix != null -> {
@@ -174,6 +173,25 @@ class ValidatorKafkaConfig {
             setCommonErrorHandler(DefaultErrorHandler(FixedBackOff(1000L, FixedBackOff.UNLIMITED_ATTEMPTS)))
         }
     }
+
+    private fun ValidatorKafkaProperties.requireCredentials(): Pair<String, String> {
+        val sanitizedUsername = username.takeUnless { it.isBlank() }
+            ?: throw IllegalStateException("validator.kafka.username must not be blank")
+        val sanitizedPassword = password.takeUnless { it.isBlank() }
+            ?: throw IllegalStateException("validator.kafka.password must not be blank")
+        return sanitizedUsername to sanitizedPassword
+    }
+
+    private fun ValidatorKafkaProperties.buildJaasConfig(username: String, password: String): String {
+        val module = when (saslMechanism) {
+            "PLAIN" -> "org.apache.kafka.common.security.plain.PlainLoginModule"
+            else -> "org.apache.kafka.common.security.scram.ScramLoginModule"
+        }
+        return "$module required username=\"${escape(username)}\" password=\"${escape(password)}\";"
+    }
+
+    private fun escape(value: String): String =
+        value.replace("\\", "\\\\").replace("\"", "\\\"")
 
     @Bean
     fun inputTopic(topicsProperties: ValidatorTopicsProperties): NewTopic =
