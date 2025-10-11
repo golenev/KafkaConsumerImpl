@@ -9,7 +9,9 @@ import com.validator.app.model.ValidatedPayload
 import consumer.service.ConsumerKafkaService
 import consumer.service.runService
 import io.kotest.assertions.throwables.shouldNotThrowAny
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
@@ -100,5 +102,24 @@ class ValidatorServiceE2eTests {
             OffsetDateTime.parse(validated.validatedAtIso)
         }
         parsedTimestamp.shouldNotBeNull()
+    }
+
+    @Test
+    fun `payload with typeAction not equal 100 is skipped`() {
+        val eventId = UUID.randomUUID().toString()
+        val payload = ValidationPayload(
+            eventId = eventId,
+            userId = "user-${UUID.randomUUID()}",
+            typeAction = 200,
+            status = "NEW",
+            sourceSystem = "validator-e2e",
+            priority = 5,
+            amount = BigDecimal("123.45"),
+        )
+
+        producer.send(eventId, payload)
+
+        val records =  consumer.waitForKeyListAbsent(eventId, timeoutMs = 30_000)
+        records.shouldBeEmpty()
     }
 }
