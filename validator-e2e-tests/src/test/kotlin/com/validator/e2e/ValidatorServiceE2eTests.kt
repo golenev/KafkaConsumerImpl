@@ -6,18 +6,17 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.validator.app.model.ValidationPayload
 import com.validator.app.model.ValidatedPayload
-import consumer.service.ConsumerKafkaConfig
 import consumer.service.ConsumerKafkaService
 import consumer.service.runService
+import io.kotest.assertions.throwables.shouldNotThrowAny
+import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.nulls.shouldNotBeNull
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotBeBlank
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.assertDoesNotThrow
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import producer.service.ProducerKafkaConfig
 import producer.service.ProducerKafkaService
 import java.math.BigDecimal
 import java.time.OffsetDateTime
@@ -33,46 +32,20 @@ class ValidatorServiceE2eTests {
 
     private lateinit var producer: ProducerKafkaService<ValidationPayload>
     private lateinit var consumer: ConsumerKafkaService<ValidatedPayload>
-
-    private val bootstrapServers: String = envOrDefault("VALIDATOR_KAFKA_BOOTSTRAP", "localhost:8817")
-    private val inputTopic: String = envOrDefault("VALIDATOR_TOPIC_INPUT", "in_validator")
-    private val outputTopic: String = envOrDefault("VALIDATOR_TOPIC_OUTPUT", "out_validator")
-    private val securityProtocol: String? = envOrNull("VALIDATOR_KAFKA_SECURITY_PROTOCOL")
-    private val saslMechanism: String? = envOrNull("VALIDATOR_KAFKA_SASL_MECHANISM")
-    private val username: String? = envOrNull("VALIDATOR_KAFKA_USERNAME")
-    private val password: String? = envOrNull("VALIDATOR_KAFKA_PASSWORD")
-    private val resolvedSecurityProtocol: String = securityProtocol
-        ?: if (!username.isNullOrBlank() && !password.isNullOrBlank()) "SASL_PLAINTEXT" else "PLAINTEXT"
-    private val resolvedSaslMechanism: String = saslMechanism ?: "SCRAM-SHA-256"
+    private val kafkaSettings = validatorKafkaSettings
 
     @BeforeAll
     fun setUp() {
-        val producerConfig = ProducerKafkaConfig(
-            bootstrapServers = bootstrapServers,
-            username = username,
-            password = password,
-        ).apply {
-            this.securityProtocol = resolvedSecurityProtocol
-            this.saslMechanism = resolvedSaslMechanism
-            clientId = "validator-e2e-tests-${UUID.randomUUID()}"
-        }
+        val producerConfig = kafkaSettings.createProducerConfig()
 
         producer = ProducerKafkaService(
             cfg = producerConfig,
-            topic = inputTopic,
+            topic = kafkaSettings.inputTopic,
             mapper = mapper,
         )
 
-        val consumerConfig = ConsumerKafkaConfig(
-            bootstrapServers = bootstrapServers,
-            username = username,
-            password = password,
-        ).apply {
-            this.securityProtocol = resolvedSecurityProtocol
-            this.saslMechanism = resolvedSaslMechanism
-            groupIdPrefix = "validator-e2e-"
-            autoCommit = false
-            awaitTopic = outputTopic
+        val consumerConfig = kafkaSettings.createConsumerConfig().apply {
+            awaitTopic = kafkaSettings.outputTopic
             awaitMapper = mapper
             awaitClazz = ValidatedPayload::class.java
             awaitLastNPerPartition = 0
@@ -111,26 +84,21 @@ class ValidatorServiceE2eTests {
         producer.send(eventId, payload)
 
         val records = consumer.waitForKeyList(eventId, timeoutMs = 30_000, min = 1, max = 1)
+        records.shouldHaveSize(1)
         val validated = records.first()
 
-        assertEquals(payload.eventId, validated.eventId)
-        assertEquals(payload.userId, validated.userId)
-        assertEquals(payload.typeAction, validated.typeAction)
-        assertEquals(payload.status, validated.status)
-        assertEquals(payload.sourceSystem, validated.sourceSystem)
-        assertEquals(payload.priority, validated.priority)
-        assertEquals(payload.amount, validated.amount)
-        assertTrue(validated.validatedAtIso.isNotBlank(), "validatedAtIso should not be blank")
+        validated.eventId shouldBe payload.eventId
+        validated.userId shouldBe payload.userId
+        validated.typeAction shouldBe payload.typeAction
+        validated.status shouldBe payload.status
+        validated.sourceSystem shouldBe payload.sourceSystem
+        validated.priority shouldBe payload.priority
+        validated.amount shouldBe payload.amount
+        validated.validatedAtIso.shouldNotBeBlank()
 
-        val parsedTimestamp = assertDoesNotThrow {
+        val parsedTimestamp = shouldNotThrowAny {
             OffsetDateTime.parse(validated.validatedAtIso)
         }
-        assertNotNull(parsedTimestamp)
+        parsedTimestamp.shouldNotBeNull()
     }
-
-    private fun envOrDefault(name: String, default: String): String =
-        envOrNull(name) ?: default
-
-    private fun envOrNull(name: String): String? =
-        System.getenv(name)?.takeIf { it.isNotBlank() }
 }
