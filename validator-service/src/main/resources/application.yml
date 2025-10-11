@@ -1,0 +1,22 @@
+server:
+  port: 8085
+
+validator:
+  kafka:
+    bootstrap-servers: ${VALIDATOR_KAFKA_BOOTSTRAP:localhost:8817}
+    group-id-prefix: validator-
+    auto-offset-reset: earliest
+    concurrency: 3
+  topics:
+    input: in_validator
+    output: out_validator
+    partitions: 3
+    replication-factor: 1
+
+spring:
+  application:
+    name: validator-service
+logging:
+  level:
+    root: INFO
+    com.validator.app: DEBUG
