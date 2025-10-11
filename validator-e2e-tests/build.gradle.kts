@@ -11,8 +11,10 @@ repositories {
 
 dependencies {
     val jacksonVersion = "2.17.2"
+    val springBootVersion = "3.3.5"
 
     testImplementation(kotlin("test"))
+    testImplementation(platform("org.springframework.boot:spring-boot-dependencies:$springBootVersion"))
     testImplementation(project(":"))
     testImplementation(project(":validator-service"))
     testImplementation("com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVersion")
