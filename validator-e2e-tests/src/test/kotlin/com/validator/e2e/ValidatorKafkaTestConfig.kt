@@ -4,13 +4,6 @@ import consumer.service.ConsumerKafkaConfig
 import producer.service.ProducerKafkaConfig
 import java.util.UUID
 
-private fun envOrNull(name: String): String? =
-    System.getenv(name)?.takeIf { it.isNotBlank() }
-
-private fun envOrThrow(name: String): String =
-    envOrNull(name)
-        ?: error("Environment variable $name must be provided for validator tests")
-
 data class ValidatorKafkaSettings(
     val bootstrapServers: String,
     val inputTopic: String,
@@ -44,27 +37,12 @@ data class ValidatorKafkaSettings(
         }
 }
 
-fun loadValidatorKafkaSettings(): ValidatorKafkaSettings {
-    val bootstrapServers = envOrThrow("VALIDATOR_KAFKA_BOOTSTRAP")
-    val inputTopic = envOrThrow("VALIDATOR_TOPIC_INPUT")
-    val outputTopic = envOrThrow("VALIDATOR_TOPIC_OUTPUT")
-    val securityProtocol = envOrNull("VALIDATOR_KAFKA_SECURITY_PROTOCOL")
-    val saslMechanism = envOrNull("VALIDATOR_KAFKA_SASL_MECHANISM")
-    val username = envOrNull("VALIDATOR_KAFKA_USERNAME")
-    val password = envOrNull("VALIDATOR_KAFKA_PASSWORD")
-    val resolvedSecurityProtocol = securityProtocol
-        ?: if (!username.isNullOrBlank() && !password.isNullOrBlank()) "SASL_PLAINTEXT" else "PLAINTEXT"
-    val resolvedSaslMechanism = saslMechanism ?: "SCRAM-SHA-256"
-
-    return ValidatorKafkaSettings(
-        bootstrapServers = bootstrapServers,
-        inputTopic = inputTopic,
-        outputTopic = outputTopic,
-        username = username,
-        password = password,
-        securityProtocol = resolvedSecurityProtocol,
-        saslMechanism = resolvedSaslMechanism,
-    )
-}
-
-val validatorKafkaSettings: ValidatorKafkaSettings = loadValidatorKafkaSettings()
+val validatorKafkaSettings = ValidatorKafkaSettings(
+    bootstrapServers = "localhost:9092",
+    inputTopic = "in_validator",
+    outputTopic = "out_validator",
+    username = null,
+    password = null,
+    securityProtocol = "PLAINTEXT",
+    saslMechanism = "SCRAM-SHA-256",
+)
