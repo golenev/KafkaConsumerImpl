@@ -1,43 +1,42 @@
-# Validator Service Setup Guide
+# Руководство по запуску сервиса Validator
 
-This project contains a Spring Boot service (`validator-service`) that validates
-incoming Kafka events and republishes the enriched payload to an output topic.
-The instructions below describe how to run the service together with the
-Redpanda broker defined in this repository.
+Этот репозиторий содержит Spring Boot сервис (`validator-service`), который валидирует
+входящие события Kafka и публикует обогащённые сообщения в выходной топик.
+Ниже приведена последовательность действий для запуска сервиса вместе с
+Redpanda из локального `docker-compose`.
 
-## Prerequisites
+## Предварительные требования
 
-- Docker & Docker Compose
+- Docker и Docker Compose
 - JDK 21+
-- Bash shell (commands below use standard Unix tooling)
+- Терминал с Unix-инструментами (Bash)
 
-## 1. Start the Kafka infrastructure
+## 1. Запустите инфраструктуру Kafka
 
-From the project root, launch Redpanda and the Redpanda Console:
+Из корня проекта поднимите Redpanda и Redpanda Console:
 
 ```bash
 docker compose up -d
 ```
 
-The compose file exposes the Kafka listener on `localhost:8817` and the console
-UI on `http://localhost:8055`. The broker creates the `out_validator` topic and
-provisions SCRAM credentials automatically:
+Compose-файл пробрасывает Kafka-листенер на `localhost:8817`, а веб-интерфейс
+консоли — на `http://localhost:8055`. Брокер автоматически создаёт топик
+`out_validator` и настраивает SCRAM-учётные данные:
 
-- **Username:** `validator_user`
-- **Password:** `validator_pass`
-- **SASL mechanism:** `SCRAM-SHA-256`
+- **Логин:** `validator_user`
+- **Пароль:** `validator_pass`
+- **Механизм SASL:** `SCRAM-SHA-256`
 
-You can follow the startup logs if needed:
+При необходимости можно посмотреть логи запуска:
 
 ```bash
 docker compose logs -f redpanda
 ```
 
-## 2. Export Kafka connection settings
+## 2. Экспортируйте параметры подключения Kafka
 
-The service reads its Kafka configuration from environment variables. When using
-the bundled Redpanda stack, export the following before starting the
-application:
+Сервис читает конфигурацию Kafka из переменных окружения. Для встроенного
+стека Redpanda выполните следующие команды перед запуском приложения:
 
 ```bash
 export VALIDATOR_KAFKA_BOOTSTRAP=localhost:8817
@@ -47,29 +46,29 @@ export VALIDATOR_KAFKA_USERNAME=validator_user
 export VALIDATOR_KAFKA_PASSWORD=validator_pass
 ```
 
-Feel free to override any other `validator.kafka.*` property the same way if you
-need to tweak consumer group behaviour or concurrency.
+При необходимости можно переопределить другие свойства `validator.kafka.*`,
+например параметры consumer group или степень параллелизма.
 
-## 3. Run the Spring Boot service
+## 3. Запустите Spring Boot сервис
 
-Use the Gradle wrapper to start the Spring Boot application:
+Используйте Gradle wrapper для старта приложения:
 
 ```bash
 ./gradlew :validator-service:bootRun
 ```
 
-The service listens on `http://localhost:8085`.
+Сервис принимает HTTP-запросы на `http://localhost:8085`.
 
-### Alternative: build a runnable JAR
+### Альтернатива: запуск из JAR
 
 ```bash
 ./gradlew :validator-service:bootJar
 java -jar validator-service/build/libs/validator-service-0.0.1-SNAPSHOT.jar
 ```
 
-## 4. Publish a validation request
+## 4. Отправьте запрос на валидацию
 
-Send a POST request to the REST endpoint, using any HTTP client. Example with
+Отправьте POST-запрос на REST-эндпоинт с помощью любого HTTP-клиента. Пример с
 `curl`:
 
 ```bash
@@ -86,22 +85,22 @@ curl -X POST http://localhost:8085/api/v1/validation \
       }'
 ```
 
-When `type_action == 100`, the service appends a timestamp and writes the message
-to the `out_validator` topic. Otherwise it logs a validation warning and stops
-processing.
+Если `type_action == 100`, сервис добавляет отметку времени и публикует
+сообщение в топик `out_validator`. В остальных случаях он пишет предупреждение
+в лог и завершает обработку.
 
-## 5. Inspect the output topic
+## 5. Проверьте содержимое выходного топика
 
-Open the Redpanda Console at `http://localhost:8055`, sign in with the
-credentials above, and view the `out_validator` topic to confirm that the
-validated event has been published.
+Откройте Redpanda Console по адресу `http://localhost:8055`, авторизуйтесь с
+указанными выше учётными данными и найдите топик `out_validator`, чтобы
+убедиться в публикации валидированного события.
 
-## 6. Shut everything down
+## 6. Остановите окружение
 
-Stop the Spring Boot process (Ctrl+C), then tear down the Docker services:
+Остановите Spring Boot сервис (Ctrl+C), затем завершите работу Docker-сервисов:
 
 ```bash
 docker compose down
 ```
 
-This stops both Redpanda and the console UI.
+Эта команда остановит Redpanda и веб-консоль.
