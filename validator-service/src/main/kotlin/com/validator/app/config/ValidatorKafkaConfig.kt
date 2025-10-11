@@ -51,7 +51,7 @@ class ValidatorKafkaConfig {
         objectMapper: ObjectMapper
     ): ProducerFactory<String, ValidationPayload> {
         val props = baseProducerProps(kafkaProperties)
-        return DefaultKafkaProducerFactory(props, StringSerializer(), JsonSerializer(objectMapper).apply {
+        return DefaultKafkaProducerFactory(props, StringSerializer(), JsonSerializer<ValidationPayload>(objectMapper).apply {
             setAddTypeInfo(false)
         })
     }
@@ -62,7 +62,7 @@ class ValidatorKafkaConfig {
         objectMapper: ObjectMapper
     ): ProducerFactory<String, ValidatedPayload> {
         val props = baseProducerProps(kafkaProperties)
-        return DefaultKafkaProducerFactory(props, StringSerializer(), JsonSerializer(objectMapper).apply {
+        return DefaultKafkaProducerFactory(props, StringSerializer(), JsonSerializer<ValidatedPayload>(objectMapper).apply {
             setAddTypeInfo(false)
         })
     }
