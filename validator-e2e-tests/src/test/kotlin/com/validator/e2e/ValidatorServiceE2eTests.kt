@@ -1,8 +1,9 @@
-package com.validator.app
+package com.validator.e2e
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.validator.app.config.ValidatorKafkaProperties
-import com.validator.app.config.ValidatorTopicsProperties
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.validator.app.model.ValidationPayload
 import com.validator.app.model.ValidatedPayload
 import consumer.service.ConsumerKafkaConfig
@@ -16,65 +17,72 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
 import producer.service.ProducerKafkaConfig
 import producer.service.ProducerKafkaService
 import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.util.UUID
 
-@SpringBootTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class ValidatorHappyPathTest {
+class ValidatorServiceE2eTests {
 
-    @Autowired
-    private lateinit var kafkaProperties: ValidatorKafkaProperties
-
-    @Autowired
-    private lateinit var topicsProperties: ValidatorTopicsProperties
-
-    @Autowired
-    private lateinit var objectMapper: ObjectMapper
+    private val mapper: ObjectMapper = ObjectMapper()
+        .registerKotlinModule()
+        .registerModule(JavaTimeModule())
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
     private lateinit var producer: ProducerKafkaService<ValidationPayload>
     private lateinit var consumer: ConsumerKafkaService<ValidatedPayload>
 
+    private val bootstrapServers: String = envOrDefault("VALIDATOR_KAFKA_BOOTSTRAP", "localhost:8817")
+    private val inputTopic: String = envOrDefault("VALIDATOR_TOPIC_INPUT", "in_validator")
+    private val outputTopic: String = envOrDefault("VALIDATOR_TOPIC_OUTPUT", "out_validator")
+    private val securityProtocol: String? = envOrNull("VALIDATOR_KAFKA_SECURITY_PROTOCOL")
+    private val saslMechanism: String? = envOrNull("VALIDATOR_KAFKA_SASL_MECHANISM")
+    private val username: String? = envOrNull("VALIDATOR_KAFKA_USERNAME")
+    private val password: String? = envOrNull("VALIDATOR_KAFKA_PASSWORD")
+    private val resolvedSecurityProtocol: String = securityProtocol
+        ?: if (!username.isNullOrBlank() && !password.isNullOrBlank()) "SASL_PLAINTEXT" else "PLAINTEXT"
+    private val resolvedSaslMechanism: String = saslMechanism ?: "SCRAM-SHA-256"
+
     @BeforeAll
     fun setUp() {
         val producerConfig = ProducerKafkaConfig(
-            bootstrapServers = kafkaProperties.bootstrapServers,
-            username = kafkaProperties.username,
-            password = kafkaProperties.password,
+            bootstrapServers = bootstrapServers,
+            username = username,
+            password = password,
         ).apply {
-            securityProtocol = kafkaProperties.securityProtocol ?: "PLAINTEXT"
-            kafkaProperties.saslMechanism?.let { saslMechanism = it }
-            clientId = "validator-happy-path-test"
+            this.securityProtocol = resolvedSecurityProtocol
+            this.saslMechanism = resolvedSaslMechanism
+            clientId = "validator-e2e-tests-${UUID.randomUUID()}"
         }
 
         producer = ProducerKafkaService(
             cfg = producerConfig,
-            topic = topicsProperties.input,
-            mapper = objectMapper,
+            topic = inputTopic,
+            mapper = mapper,
         )
 
         val consumerConfig = ConsumerKafkaConfig(
-            bootstrapServers = kafkaProperties.bootstrapServers,
-            username = kafkaProperties.username,
-            password = kafkaProperties.password,
+            bootstrapServers = bootstrapServers,
+            username = username,
+            password = password,
         ).apply {
-            securityProtocol = kafkaProperties.securityProtocol ?: "PLAINTEXT"
-            kafkaProperties.saslMechanism?.let { saslMechanism = it }
-            groupIdPrefix = "validator-happy-path-"
+            this.securityProtocol = resolvedSecurityProtocol
+            this.saslMechanism = resolvedSaslMechanism
+            groupIdPrefix = "validator-e2e-"
             autoCommit = false
-            awaitTopic = topicsProperties.output
-            awaitMapper = objectMapper
+            awaitTopic = outputTopic
+            awaitMapper = mapper
             awaitClazz = ValidatedPayload::class.java
             awaitLastNPerPartition = 0
         }
 
         consumer = runService(consumerConfig) { it.eventId }
         consumer.start()
+
+        // небольшая пауза, чтобы консюмер успел подписаться на топик до начала теста
+        Thread.sleep(500)
     }
 
     @AfterAll
@@ -95,9 +103,9 @@ class ValidatorHappyPathTest {
             userId = "user-${UUID.randomUUID()}",
             typeAction = 100,
             status = "NEW",
-            sourceSystem = "integration-test",
-            priority = 5,
-            amount = BigDecimal("123.45"),
+            sourceSystem = "validator-e2e",
+            priority = 7,
+            amount = BigDecimal("321.00"),
         )
 
         producer.send(eventId, payload)
@@ -119,4 +127,10 @@ class ValidatorHappyPathTest {
         }
         assertNotNull(parsedTimestamp)
     }
+
+    private fun envOrDefault(name: String, default: String): String =
+        envOrNull(name) ?: default
+
+    private fun envOrNull(name: String): String? =
+        System.getenv(name)?.takeIf { it.isNotBlank() }
 }
