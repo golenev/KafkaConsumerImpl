@@ -128,6 +128,16 @@ class ConsumerKafkaService<T : Any>(
     ): List<T> = waiter.waitMany(key, timeoutMs, min, max)
 
     /**
+     * Ожидает отсутствие сообщений для указанного [key] в течение [timeoutMs].
+     * Если сообщение появилось, возбуждает [IllegalStateException].
+     * Возвращает пустой список для удобства негативных проверок.
+     */
+    fun waitForKeyListAbsent(
+        key: String,
+        timeoutMs: Long = 40_000,
+    ): List<T> = waiter.waitNone(key, timeoutMs)
+
+    /**
      * Останавливает цикл чтения из Kafka и завершает поток.
      * Повторные вызовы игнорируются.
      */

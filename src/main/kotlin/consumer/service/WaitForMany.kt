@@ -50,6 +50,22 @@ class WaitForMany<K, V> {
     }
 
     /**
+     * Ожидает отсутствие элементов для ключа [key] в течение [timeoutMs].
+     * Если в очереди появится хотя бы один элемент, возбуждает [IllegalStateException].
+     * Возвращает пустой список в случае успешного ожидания.
+     */
+    fun waitNone(
+        key: K,
+        timeoutMs: Long,
+    ): List<V> {
+        val values = waitMany(key, timeoutMs, min = 0, max = 1)
+        if (values.isNotEmpty()) {
+            throw IllegalStateException("Expected no values for key=$key, but received: $values")
+        }
+        return emptyList()
+    }
+
+    /**
      * Очищает очередь ожидания для указанного ключа [key].
      * Полезно для сброса состояния между тестами.
      */
