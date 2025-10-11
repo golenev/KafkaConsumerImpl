@@ -33,10 +33,8 @@ class ProducerKafkaService<T : Any>(
     }
 
     override fun close() {
-        try {
-            producer.flush()
-        } finally {
-            producer.close()
+        producer.use {
+            it.flush()
         }
     }
 }

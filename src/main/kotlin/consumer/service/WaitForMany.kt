@@ -69,7 +69,7 @@ class WaitForMany<K, V> {
     ): List<V> {
         val values = waitMany(key, timeoutMs, min = 0, max = 1)
         if (values.isNotEmpty()) {
-            throw IllegalStateException("Expected no values for key=$key, but received: $values")
+            error("Expected no values for key=$key, but received: $values")
         }
         return emptyList()
     }

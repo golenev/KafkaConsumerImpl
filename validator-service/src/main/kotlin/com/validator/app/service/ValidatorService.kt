@@ -8,14 +8,16 @@ import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Service
+import java.lang.Thread.sleep
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.*
 
 @Service
 class ValidatorService(
     private val topicsProperties: ValidatorTopicsProperties,
-    private val kafkaTemplate: KafkaTemplate<String, ValidatedPayload>
+    private val kafkaTemplate: KafkaTemplate<String, ValidatedPayload>,
 ) {
 
     private val logger = LoggerFactory.getLogger(ValidatorService::class.java)
@@ -46,7 +48,8 @@ class ValidatorService(
             amount = payload.amount,
             validatedAtIso = OffsetDateTime.now(ZoneOffset.UTC).format(formatter)
         )
-
+        val randomPauseValue = Random().nextLong(10000, 15000);
+        sleep(randomPauseValue)
         kafkaTemplate.send(topicsProperties.output, payload.eventId, validated)
         logger.info("Validated payload with eventId={} and forwarded to {}", payload.eventId, topicsProperties.output)
         acknowledgment.acknowledge()
