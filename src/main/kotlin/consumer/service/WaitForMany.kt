@@ -1,11 +1,13 @@
 package consumer.service
 
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 class WaitForMany<K, V> {
     private val map = ConcurrentHashMap<K, LinkedBlockingQueue<V>>()
+    private val log = LoggerFactory.getLogger(WaitForMany::class.java)
 
     /**
      * Добавляет элемент [value] в очередь ожидания для ключа [key].
@@ -34,6 +36,13 @@ class WaitForMany<K, V> {
 
         while (System.nanoTime() < deadlineNs && out.size < max) {
             val remNs = deadlineNs - System.nanoTime()
+            log.debug(
+                "Polling queue for key={} remainingNs={} collected={}/{}",
+                key,
+                remNs,
+                out.size,
+                max
+            )
             val v = q.poll(
                 TimeUnit.NANOSECONDS.toMillis(remNs.coerceAtLeast(0)),
                 TimeUnit.MILLISECONDS

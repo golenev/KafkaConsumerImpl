@@ -25,9 +25,9 @@ class ProducerKafkaService<T : Any>(
 
         try {
             producer.send(record).get(30, TimeUnit.SECONDS)
-            logger.info("Sent payload with key={} to topic {}", key, topic)
+            logger.info("Sent payload with key={} to topic {}: {}", key, topic, json)
         } catch (ex: Exception) {
-            logger.error("Failed to send payload with key={} to topic {}", key, topic, ex)
+            logger.error("Failed to send payload with key={} to topic {}: {}", key, topic, json, ex)
             throw ex
         }
     }

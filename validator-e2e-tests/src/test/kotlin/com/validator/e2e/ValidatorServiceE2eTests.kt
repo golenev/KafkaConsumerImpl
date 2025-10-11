@@ -101,4 +101,22 @@ class ValidatorServiceE2eTests {
         }
         parsedTimestamp.shouldNotBeNull()
     }
+
+    @Test
+    fun `payload with typeAction not equal 100 is skipped`() {
+        val eventId = UUID.randomUUID().toString()
+        val payload = ValidationPayload(
+            eventId = eventId,
+            userId = "user-${UUID.randomUUID()}",
+            typeAction = 200,
+            status = "NEW",
+            sourceSystem = "validator-e2e",
+            priority = 5,
+            amount = BigDecimal("123.45"),
+        )
+
+        producer.send(eventId, payload)
+
+        consumer.waitForKeyListAbsent(eventId, timeoutMs = 30_000)
+    }
 }
