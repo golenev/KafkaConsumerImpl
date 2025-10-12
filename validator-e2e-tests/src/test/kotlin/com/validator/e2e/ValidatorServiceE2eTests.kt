@@ -21,47 +21,49 @@ import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.util.UUID
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ValidatorServiceE2eTests {
 
-    private val mapper = ValidatorTestObjectMapper.globalMapper
+    companion object {
+        private lateinit var producer: ProducerKafkaService<ValidationPayload>
+        private lateinit var consumer: ConsumerKafkaService<ValidatedPayload>
+        private val producerSettings = ValidatorProducerKafkaSettings()
+        private val consumerSettings = ValidatorConsumerKafkaSettings()
+        private val mapper = ValidatorTestObjectMapper.globalMapper
 
-    private lateinit var producer: ProducerKafkaService<ValidationPayload>
-    private lateinit var consumer: ConsumerKafkaService<ValidatedPayload>
-    private val producerSettings = ValidatorProducerKafkaSettings()
-    private val consumerSettings = ValidatorConsumerKafkaSettings()
+        @JvmStatic
+        @BeforeAll
+        fun setUp() {
+            val producerConfig = producerSettings.createProducerConfig()
 
-    @BeforeAll
-    fun setUp() {
-        val producerConfig = producerSettings.createProducerConfig()
+            producer = ProducerKafkaService(
+                cfg = producerConfig,
+                topic = producerSettings.inputTopic,
+                mapper = mapper,
+            )
 
-        producer = ProducerKafkaService(
-            cfg = producerConfig,
-            topic = producerSettings.inputTopic,
-            mapper = mapper,
-        )
+            val consumerConfig = consumerSettings.createConsumerConfig().apply {
+                awaitTopic = consumerSettings.outputTopic
+                awaitMapper = mapper
+                awaitClazz = ValidatedPayload::class.java
+                awaitLastNPerPartition = 0
+            }
 
-        val consumerConfig = consumerSettings.createConsumerConfig().apply {
-            awaitTopic = consumerSettings.outputTopic
-            awaitMapper = mapper
-            awaitClazz = ValidatedPayload::class.java
-            awaitLastNPerPartition = 0
+            consumer = runService(consumerConfig) { it.officeId }
+            consumer.start()
+
+            // небольшая пауза, чтобы консюмер успел подписаться на топик до начала теста
+            Thread.sleep(500)
         }
 
-        consumer = runService(consumerConfig) { it.officeId }
-        consumer.start()
-
-        // небольшая пауза, чтобы консюмер успел подписаться на топик до начала теста
-        Thread.sleep(500)
-    }
-
-    @AfterAll
-    fun tearDown() {
-        if (::producer.isInitialized) {
-            producer.close()
-        }
-        if (::consumer.isInitialized) {
-            consumer.close()
+        @JvmStatic
+        @AfterAll
+        fun tearDown() {
+            if (::producer.isInitialized) {
+                producer.close()
+            }
+            if (::consumer.isInitialized) {
+                consumer.close()
+            }
         }
     }
 
