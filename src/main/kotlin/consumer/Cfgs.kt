@@ -6,8 +6,8 @@ import consumer.service.ConsumerKafkaConfig
 val someConsumerConfig: ConsumerKafkaConfig =
     ConsumerKafkaConfig(
         bootstrapServers = "",
-        username = "",
-        password = "",
+        username = "replace-me",
+        password = "replace-me",
     ).apply {
         securityProtocol = "SASL_PLAINTEXT"
         saslMechanism = "SCRAM-SHA-256"

@@ -7,6 +7,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.errors.AuthenticationException
 import org.apache.kafka.common.errors.WakeupException
 import org.slf4j.LoggerFactory
 import java.time.Duration
@@ -55,7 +56,17 @@ class ConsumerKafkaService<T : Any>(
             putIfAbsent(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
         }
 
-        consumer = KafkaConsumer(props)
+        consumer = try {
+            KafkaConsumer(props)
+        } catch (authException: AuthenticationException) {
+            isRunningNow.set(false)
+            log.error("Failed to initialize Kafka consumer for topic {} due to authentication error", topic, authException)
+            throw authException
+        } catch (ex: Exception) {
+            isRunningNow.set(false)
+            log.error("Failed to initialize Kafka consumer for topic {}", topic, ex)
+            throw ex
+        }
         threadRef = thread(name = "kafka-await-$topic", start = true) { run() }
     }
 
@@ -97,6 +108,9 @@ class ConsumerKafkaService<T : Any>(
                     }
                 }
             }
+        } catch (e: AuthenticationException) {
+            log.error("Kafka authentication error while consuming from {}", topic, e)
+            throw e
         } catch (e: WakeupException) {
             // ожидаемый путь при остановке: wakeup() прерывает poll()
             if (isRunningNow.get()) log.error("Unexpected wakeup while consuming", e)

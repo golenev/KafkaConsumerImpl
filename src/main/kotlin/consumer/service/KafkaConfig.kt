@@ -8,6 +8,7 @@ open class KafkaConfig(
     protected val username: String?,
     protected val password: String?,
 ) {
+
     private val JAAS_SCRAM_MODULE =
         "org.apache.kafka.common.security.scram.ScramLoginModule"
     private val JAAS_PLAIN_MODULE =
@@ -27,27 +28,51 @@ open class KafkaConfig(
     open fun toProperties(): Properties = Properties().apply {
         put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
 
-        val hasCredentials = !username.isNullOrBlank() && !password.isNullOrBlank()
+        if (saslMechanism == "PLAIN" && jaasModule != JAAS_PLAIN_MODULE) {
+            jaasModule = JAAS_PLAIN_MODULE
+        } else if (
+            (saslMechanism == "SCRAM-SHA-256" || saslMechanism == "SCRAM-SHA-512")
+            && jaasModule != JAAS_SCRAM_MODULE
+        ) {
+            jaasModule = JAAS_SCRAM_MODULE
+        }
 
-        if (hasCredentials) {
-            if (saslMechanism == "PLAIN" && jaasModule != JAAS_PLAIN_MODULE) {
-                jaasModule = JAAS_PLAIN_MODULE
-            } else if (
-                (saslMechanism == "SCRAM-SHA-256" || saslMechanism == "SCRAM-SHA-512")
-                && jaasModule != JAAS_SCRAM_MODULE
-            ) {
-                jaasModule = JAAS_SCRAM_MODULE
+        val sanitizedUsername = username?.takeUnless { it.isBlank() }
+        val sanitizedPassword = password?.takeUnless { it.isBlank() }
+
+        if (securityProtocol.uppercase().startsWith("SASL")) {
+            val (user, pass) = when {
+                sanitizedUsername == null && sanitizedPassword == null ->
+                    throw IllegalStateException(
+                        "Для security.protocol=$securityProtocol необходимо задать логин и пароль Kafka"
+                    )
+
+                sanitizedUsername == null || sanitizedPassword == null ->
+                    throw IllegalStateException(
+                        "Нужно одновременно указать validator.kafka.username и validator.kafka.password"
+                    )
+
+                else -> sanitizedUsername to sanitizedPassword
             }
 
             put(
                 "sasl.jaas.config",
-                """$jaasModule required username=\"$username\" password=\"$password\";"""
+                "$jaasModule required username=\"${escape(user)}\" password=\"${escape(pass)}\";"
             )
             put("sasl.mechanism", saslMechanism)
+        } else if (sanitizedUsername != null || sanitizedPassword != null) {
+            if (sanitizedUsername == null || sanitizedPassword == null) {
+                throw IllegalStateException(
+                    "Нужно одновременно указать validator.kafka.username и validator.kafka.password"
+                )
+            }
         }
 
         put("security.protocol", securityProtocol)
     }
+
+    private fun escape(value: String): String =
+        value.replace("\\", "\\\\").replace("\"", "\\\"")
 
 }
 
