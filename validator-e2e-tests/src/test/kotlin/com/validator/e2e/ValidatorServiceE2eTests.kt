@@ -48,7 +48,7 @@ class ValidatorServiceE2eTests {
             awaitLastNPerPartition = 0
         }
 
-        consumer = runService(consumerConfig) { it.eventId }
+        consumer = runService(consumerConfig) { it.officeId }
         consumer.start()
 
         // небольшая пауза, чтобы консюмер успел подписаться на топик до начала теста
@@ -67,10 +67,12 @@ class ValidatorServiceE2eTests {
 
     @Test
     fun `payload with typeAction 100 is enriched and forwarded`() {
+        val officeId = "office-${UUID.randomUUID()}"
         val eventId = UUID.randomUUID().toString()
         val payload = ValidationPayload(
             eventId = eventId,
             userId = "user-${UUID.randomUUID()}",
+            officeId = officeId,
             typeAction = 100,
             status = "NEW",
             sourceSystem = "validator-e2e",
@@ -80,12 +82,13 @@ class ValidatorServiceE2eTests {
 
         producer.send(eventId, payload)
 
-        val records = consumer.waitForKeyList(eventId, timeoutMs = 30_000, min = 1, max = 1)
+        val records = consumer.waitForKeyList(officeId, timeoutMs = 30_000, min = 1, max = 1)
         records.shouldHaveSize(1)
         val validated = records.first()
 
         validated.eventId shouldBe payload.eventId
         validated.userId shouldBe payload.userId
+        validated.officeId shouldBe payload.officeId
         validated.typeAction shouldBe payload.typeAction
         validated.status shouldBe payload.status
         validated.sourceSystem shouldBe payload.sourceSystem
@@ -101,10 +104,12 @@ class ValidatorServiceE2eTests {
 
     @Test
     fun `payload with typeAction 300 produces two output messages`() {
+        val officeId = "office-${UUID.randomUUID()}"
         val eventId = UUID.randomUUID().toString()
         val payload = ValidationPayload(
             eventId = eventId,
             userId = "user-${UUID.randomUUID()}",
+            officeId = officeId,
             typeAction = 300,
             status = "NEW",
             sourceSystem = "validator-e2e",
@@ -114,13 +119,14 @@ class ValidatorServiceE2eTests {
 
         producer.send(eventId, payload)
 
-        val records = consumer.waitForKeyList(eventId, timeoutMs = 30_000, min = 2, max = 2)
+        val records = consumer.waitForKeyList(officeId, timeoutMs = 30_000, min = 2, max = 2)
         records.shouldHaveSize(2)
         records.forEach { validated ->
             validated.typeAction shouldBe payload.typeAction
             validated.status shouldBe payload.status
             validated.sourceSystem shouldBe payload.sourceSystem
             validated.amount shouldBe payload.amount
+            validated.officeId shouldBe officeId
             validated.validatedAtIso.shouldNotBeBlank()
             shouldNotThrowAny { OffsetDateTime.parse(validated.validatedAtIso) }.shouldNotBeNull()
         }
@@ -137,10 +143,12 @@ class ValidatorServiceE2eTests {
 
     @Test
     fun `payload with unsupported typeAction is skipped`() {
+        val officeId = "office-${UUID.randomUUID()}"
         val eventId = UUID.randomUUID().toString()
         val payload = ValidationPayload(
             eventId = eventId,
             userId = "user-${UUID.randomUUID()}",
+            officeId = officeId,
             typeAction = 200,
             status = "NEW",
             sourceSystem = "validator-e2e",
@@ -150,7 +158,7 @@ class ValidatorServiceE2eTests {
 
         producer.send(eventId, payload)
 
-        val records = consumer.waitForKeyListAbsent(eventId, timeoutMs = 30_000)
+        val records = consumer.waitForKeyListAbsent(officeId, timeoutMs = 30_000)
         records.shouldBeEmpty()
     }
 }

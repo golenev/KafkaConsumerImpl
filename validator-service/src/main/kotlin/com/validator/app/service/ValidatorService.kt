@@ -63,6 +63,7 @@ class ValidatorService(
         ValidatedPayload(
             eventId = payload.eventId,
             userId = payload.userId,
+            officeId = payload.officeId,
             typeAction = payload.typeAction,
             status = payload.status,
             sourceSystem = payload.sourceSystem,
@@ -73,13 +74,12 @@ class ValidatorService(
 
     private fun createDuplicateValidatedPayloads(payload: ValidationPayload): List<ValidatedPayload> {
         val primary = createValidatedPayload(payload)
-        val secondary = createValidatedPayload(
-            payload.copy(
-                eventId = "${payload.eventId}-secondary",
-                userId = "${payload.userId}-secondary",
-                priority = payload.priority + 1
-            )
+        val secondarySource = payload.copy(
+            eventId = "${payload.eventId}-secondary",
+            userId = "${payload.userId}-secondary",
+            priority = payload.priority + 1
         )
+        val secondary = createValidatedPayload(secondarySource)
         return listOf(primary, secondary)
     }
 }
