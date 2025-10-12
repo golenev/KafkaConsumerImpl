@@ -23,7 +23,7 @@ open class KafkaConfig(
         }
 
     var jaasModule: String = JAAS_SCRAM_MODULE
-    var securityProtocol: String = "SASL_PLAINTEXT"
+    var securityProtocol: String = "PLAINTEXT"
 
     open fun toProperties(): Properties = Properties().apply {
         put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)

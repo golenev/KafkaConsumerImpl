@@ -9,7 +9,7 @@ validator:
     group-id-prefix: validator-
     auto-offset-reset: earliest
     concurrency: 3
-    security-protocol: ${VALIDATOR_KAFKA_SECURITY_PROTOCOL:SASL_PLAINTEXT}
+    security-protocol: ${VALIDATOR_KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
     sasl-mechanism: ${VALIDATOR_KAFKA_SASL_MECHANISM:SCRAM-SHA-256}
   topics:
     input: in_validator
