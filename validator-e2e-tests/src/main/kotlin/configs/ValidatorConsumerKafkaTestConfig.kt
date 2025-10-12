@@ -1,4 +1,4 @@
-package com.validator.e2e
+package configs
 
 import consumer.service.ConsumerKafkaConfig
 

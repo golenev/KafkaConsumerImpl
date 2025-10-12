@@ -2,6 +2,8 @@ package com.validator.e2e
 
 import com.validator.app.model.ValidationPayload
 import com.validator.app.model.ValidatedPayload
+import configs.ValidatorConsumerKafkaSettings
+import configs.ValidatorProducerKafkaSettings
 import consumer.service.ConsumerKafkaService
 import consumer.service.runService
 import io.kotest.assertions.throwables.shouldNotThrowAny
@@ -22,7 +24,7 @@ import java.util.UUID
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ValidatorServiceE2eTests {
 
-    private val mapper = createValidatorTestObjectMapper()
+    private val mapper = ValidatorTestObjectMapper.globalMapper
 
     private lateinit var producer: ProducerKafkaService<ValidationPayload>
     private lateinit var consumer: ConsumerKafkaService<ValidatedPayload>
@@ -98,7 +100,37 @@ class ValidatorServiceE2eTests {
     }
 
     @Test
-    fun `payload with typeAction not equal 100 is skipped`() {
+    fun `payload with typeAction 300 produces two output messages`() {
+        val eventId = UUID.randomUUID().toString()
+        val payload = ValidationPayload(
+            eventId = eventId,
+            userId = "user-${UUID.randomUUID()}",
+            typeAction = 300,
+            status = "NEW",
+            sourceSystem = "validator-e2e",
+            priority = 9,
+            amount = BigDecimal("987.65"),
+        )
+
+        producer.send(eventId, payload)
+
+        val records = consumer.waitForKeyList(eventId, timeoutMs = 30_000, min = 2, max = 2)
+        records.shouldHaveSize(2)
+        records.forEach { validated ->
+            validated.eventId shouldBe payload.eventId
+            validated.userId shouldBe payload.userId
+            validated.typeAction shouldBe payload.typeAction
+            validated.status shouldBe payload.status
+            validated.sourceSystem shouldBe payload.sourceSystem
+            validated.priority shouldBe payload.priority
+            validated.amount shouldBe payload.amount
+            validated.validatedAtIso.shouldNotBeBlank()
+            shouldNotThrowAny { OffsetDateTime.parse(validated.validatedAtIso) }.shouldNotBeNull()
+        }
+    }
+
+    @Test
+    fun `payload with unsupported typeAction is skipped`() {
         val eventId = UUID.randomUUID().toString()
         val payload = ValidationPayload(
             eventId = eventId,
@@ -112,7 +144,7 @@ class ValidatorServiceE2eTests {
 
         producer.send(eventId, payload)
 
-        val records =  consumer.waitForKeyListAbsent(eventId, timeoutMs = 30_000)
+        val records = consumer.waitForKeyListAbsent(eventId, timeoutMs = 30_000)
         records.shouldBeEmpty()
     }
 }
