@@ -1,9 +1,5 @@
 package com.validator.e2e
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.validator.app.model.ValidationPayload
 import com.validator.app.model.ValidatedPayload
 import consumer.service.ConsumerKafkaService
@@ -11,7 +7,6 @@ import consumer.service.runService
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
@@ -27,27 +22,25 @@ import java.util.UUID
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ValidatorServiceE2eTests {
 
-    private val mapper: ObjectMapper = ObjectMapper()
-        .registerKotlinModule()
-        .registerModule(JavaTimeModule())
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+    private val mapper = createValidatorTestObjectMapper()
 
     private lateinit var producer: ProducerKafkaService<ValidationPayload>
     private lateinit var consumer: ConsumerKafkaService<ValidatedPayload>
-    private val kafkaSettings = validatorKafkaSettings
+    private val producerSettings = ValidatorProducerKafkaSettings()
+    private val consumerSettings = ValidatorConsumerKafkaSettings()
 
     @BeforeAll
     fun setUp() {
-        val producerConfig = kafkaSettings.createProducerConfig()
+        val producerConfig = producerSettings.createProducerConfig()
 
         producer = ProducerKafkaService(
             cfg = producerConfig,
-            topic = kafkaSettings.inputTopic,
+            topic = producerSettings.inputTopic,
             mapper = mapper,
         )
 
-        val consumerConfig = kafkaSettings.createConsumerConfig().apply {
-            awaitTopic = kafkaSettings.outputTopic
+        val consumerConfig = consumerSettings.createConsumerConfig().apply {
+            awaitTopic = consumerSettings.outputTopic
             awaitMapper = mapper
             awaitClazz = ValidatedPayload::class.java
             awaitLastNPerPartition = 0
