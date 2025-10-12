@@ -14,8 +14,8 @@ data class ValidationPayload(
     val eventId: String,
     @field:NotBlank
     val userId: String,
-    @field:NotBlank
-    val officeId: String,
+    @field:NotNull
+    val officeId: Long,
     @field:NotNull
     @JsonProperty("type_action")
     val typeAction: Int,
@@ -34,7 +34,7 @@ data class ValidationPayload(
 data class ValidatedPayload(
     val eventId: String,
     val userId: String,
-    val officeId: String,
+    val officeId: Long,
     @JsonProperty("type_action")
     val typeAction: Int,
     val status: String,
