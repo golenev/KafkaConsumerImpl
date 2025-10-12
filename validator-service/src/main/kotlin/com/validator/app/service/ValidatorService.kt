@@ -42,9 +42,12 @@ class ValidatorService(
             }
         }
 
-        validatedPayloads.forEachIndexed { index, validated ->
+        if (validatedPayloads.isNotEmpty()) {
             val randomPauseValue = Random().nextLong(10000, 15000)
             sleep(randomPauseValue)
+        }
+
+        validatedPayloads.forEachIndexed { index, validated ->
             kafkaTemplate.send(topicsProperties.output, payload.eventId, validated)
             logger.info(
                 "Validated payload with eventId={} (key={}) forwarded to {} (message {}/{})",
