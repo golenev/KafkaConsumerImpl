@@ -1,17 +1,14 @@
 package com.validator.e2e
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.validator.app.model.ValidationPayload
 import com.validator.app.model.ValidatedPayload
+import configs.ValidatorConsumerKafkaSettings
+import configs.ValidatorProducerKafkaSettings
 import consumer.service.ConsumerKafkaService
 import consumer.service.runService
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
@@ -27,33 +24,31 @@ import java.util.UUID
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ValidatorServiceE2eTests {
 
-    private val mapper: ObjectMapper = ObjectMapper()
-        .registerKotlinModule()
-        .registerModule(JavaTimeModule())
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+    private val mapper = ValidatorTestObjectMapper.globalMapper
 
     private lateinit var producer: ProducerKafkaService<ValidationPayload>
     private lateinit var consumer: ConsumerKafkaService<ValidatedPayload>
-    private val kafkaSettings = validatorKafkaSettings
+    private val producerSettings = ValidatorProducerKafkaSettings()
+    private val consumerSettings = ValidatorConsumerKafkaSettings()
 
     @BeforeAll
     fun setUp() {
-        val producerConfig = kafkaSettings.createProducerConfig()
+        val producerConfig = producerSettings.createProducerConfig()
 
         producer = ProducerKafkaService(
             cfg = producerConfig,
-            topic = kafkaSettings.inputTopic,
+            topic = producerSettings.inputTopic,
             mapper = mapper,
         )
 
-        val consumerConfig = kafkaSettings.createConsumerConfig().apply {
-            awaitTopic = kafkaSettings.outputTopic
+        val consumerConfig = consumerSettings.createConsumerConfig().apply {
+            awaitTopic = consumerSettings.outputTopic
             awaitMapper = mapper
             awaitClazz = ValidatedPayload::class.java
             awaitLastNPerPartition = 0
         }
 
-        consumer = runService(consumerConfig) { it.eventId }
+        consumer = runService(consumerConfig) { it.officeId }
         consumer.start()
 
         // небольшая пауза, чтобы консюмер успел подписаться на топик до начала теста
@@ -72,10 +67,12 @@ class ValidatorServiceE2eTests {
 
     @Test
     fun `payload with typeAction 100 is enriched and forwarded`() {
+        val officeId = "office-${UUID.randomUUID()}"
         val eventId = UUID.randomUUID().toString()
         val payload = ValidationPayload(
             eventId = eventId,
             userId = "user-${UUID.randomUUID()}",
+            officeId = officeId,
             typeAction = 100,
             status = "NEW",
             sourceSystem = "validator-e2e",
@@ -85,12 +82,13 @@ class ValidatorServiceE2eTests {
 
         producer.send(eventId, payload)
 
-        val records = consumer.waitForKeyList(eventId, timeoutMs = 30_000, min = 1, max = 1)
+        val records = consumer.waitForKeyList(officeId, timeoutMs = 30_000, min = 1, max = 1)
         records.shouldHaveSize(1)
         val validated = records.first()
 
         validated.eventId shouldBe payload.eventId
         validated.userId shouldBe payload.userId
+        validated.officeId shouldBe payload.officeId
         validated.typeAction shouldBe payload.typeAction
         validated.status shouldBe payload.status
         validated.sourceSystem shouldBe payload.sourceSystem
@@ -105,11 +103,52 @@ class ValidatorServiceE2eTests {
     }
 
     @Test
-    fun `payload with typeAction not equal 100 is skipped`() {
+    fun `payload with typeAction 300 produces two output messages`() {
+        val officeId = "office-${UUID.randomUUID()}"
         val eventId = UUID.randomUUID().toString()
         val payload = ValidationPayload(
             eventId = eventId,
             userId = "user-${UUID.randomUUID()}",
+            officeId = officeId,
+            typeAction = 300,
+            status = "NEW",
+            sourceSystem = "validator-e2e",
+            priority = 9,
+            amount = BigDecimal("987.65"),
+        )
+
+        producer.send(eventId, payload)
+
+        val records = consumer.waitForKeyList(officeId, timeoutMs = 30_000, min = 2, max = 2)
+        records.shouldHaveSize(2)
+        records.forEach { validated ->
+            validated.typeAction shouldBe payload.typeAction
+            validated.status shouldBe payload.status
+            validated.sourceSystem shouldBe payload.sourceSystem
+            validated.amount shouldBe payload.amount
+            validated.officeId shouldBe officeId
+            validated.validatedAtIso.shouldNotBeBlank()
+            shouldNotThrowAny { OffsetDateTime.parse(validated.validatedAtIso) }.shouldNotBeNull()
+        }
+
+        val expectedEventIds = setOf(payload.eventId, "${payload.eventId}-secondary")
+        records.map { it.eventId }.toSet() shouldBe expectedEventIds
+
+        val expectedUserIds = setOf(payload.userId, "${payload.userId}-secondary")
+        records.map { it.userId }.toSet() shouldBe expectedUserIds
+
+        val expectedPriorities = setOf(payload.priority, payload.priority + 1)
+        records.map { it.priority }.toSet() shouldBe expectedPriorities
+    }
+
+    @Test
+    fun `payload with unsupported typeAction is skipped`() {
+        val officeId = "office-${UUID.randomUUID()}"
+        val eventId = UUID.randomUUID().toString()
+        val payload = ValidationPayload(
+            eventId = eventId,
+            userId = "user-${UUID.randomUUID()}",
+            officeId = officeId,
             typeAction = 200,
             status = "NEW",
             sourceSystem = "validator-e2e",
@@ -119,7 +158,7 @@ class ValidatorServiceE2eTests {
 
         producer.send(eventId, payload)
 
-        val records =  consumer.waitForKeyListAbsent(eventId, timeoutMs = 30_000)
+        val records = consumer.waitForKeyListAbsent(officeId, timeoutMs = 30_000)
         records.shouldBeEmpty()
     }
 }
