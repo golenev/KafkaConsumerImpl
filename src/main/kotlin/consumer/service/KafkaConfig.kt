@@ -57,7 +57,7 @@ open class KafkaConfig(
 
             put(
                 "sasl.jaas.config",
-                """$jaasModule required username=\"${escape(user)}\" password=\"${escape(pass)}\";"""
+                "$jaasModule required username=\"${escape(user)}\" password=\"${escape(pass)}\";"
             )
             put("sasl.mechanism", saslMechanism)
         } else if (sanitizedUsername != null || sanitizedPassword != null) {
