@@ -28,9 +28,9 @@ class ValidatorService(
         containerFactory = "validatorKafkaListenerContainerFactory"
     )
     fun onMessage(payload: ValidationPayload, acknowledgment: Acknowledgment) {
-        val repeatCount = when (payload.typeAction) {
-            100 -> 1
-            300 -> 2
+        val validatedPayloads = when (payload.typeAction) {
+            100 -> listOf(createValidatedPayload(payload))
+            300 -> createDuplicateValidatedPayloads(payload)
             else -> {
                 logger.warn(
                     "Skip payload with eventId={} because typeAction={} does not match validation rule",
@@ -42,17 +42,17 @@ class ValidatorService(
             }
         }
 
-        repeat(repeatCount) { index ->
-            val validated = createValidatedPayload(payload)
+        validatedPayloads.forEachIndexed { index, validated ->
             val randomPauseValue = Random().nextLong(10000, 15000)
             sleep(randomPauseValue)
             kafkaTemplate.send(topicsProperties.output, payload.eventId, validated)
             logger.info(
-                "Validated payload with eventId={} and forwarded to {} (message {}/{})",
+                "Validated payload with eventId={} (key={}) forwarded to {} (message {}/{})",
+                validated.eventId,
                 payload.eventId,
                 topicsProperties.output,
                 index + 1,
-                repeatCount
+                validatedPayloads.size
             )
         }
 
@@ -70,4 +70,16 @@ class ValidatorService(
             amount = payload.amount,
             validatedAtIso = OffsetDateTime.now(ZoneOffset.UTC).format(formatter)
         )
+
+    private fun createDuplicateValidatedPayloads(payload: ValidationPayload): List<ValidatedPayload> {
+        val primary = createValidatedPayload(payload)
+        val secondary = createValidatedPayload(
+            payload.copy(
+                eventId = "${payload.eventId}-secondary",
+                userId = "${payload.userId}-secondary",
+                priority = payload.priority + 1
+            )
+        )
+        return listOf(primary, secondary)
+    }
 }

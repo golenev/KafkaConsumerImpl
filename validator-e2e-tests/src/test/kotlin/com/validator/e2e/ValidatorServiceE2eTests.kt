@@ -117,16 +117,22 @@ class ValidatorServiceE2eTests {
         val records = consumer.waitForKeyList(eventId, timeoutMs = 30_000, min = 2, max = 2)
         records.shouldHaveSize(2)
         records.forEach { validated ->
-            validated.eventId shouldBe payload.eventId
-            validated.userId shouldBe payload.userId
             validated.typeAction shouldBe payload.typeAction
             validated.status shouldBe payload.status
             validated.sourceSystem shouldBe payload.sourceSystem
-            validated.priority shouldBe payload.priority
             validated.amount shouldBe payload.amount
             validated.validatedAtIso.shouldNotBeBlank()
             shouldNotThrowAny { OffsetDateTime.parse(validated.validatedAtIso) }.shouldNotBeNull()
         }
+
+        val expectedEventIds = setOf(payload.eventId, "${payload.eventId}-secondary")
+        records.map { it.eventId }.toSet() shouldBe expectedEventIds
+
+        val expectedUserIds = setOf(payload.userId, "${payload.userId}-secondary")
+        records.map { it.userId }.toSet() shouldBe expectedUserIds
+
+        val expectedPriorities = setOf(payload.priority, payload.priority + 1)
+        records.map { it.priority }.toSet() shouldBe expectedPriorities
     }
 
     @Test
