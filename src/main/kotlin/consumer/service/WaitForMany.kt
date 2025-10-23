@@ -1,12 +1,16 @@
 package consumer.service
 
 import org.slf4j.LoggerFactory
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class WaitForMany<K, V> {
     private val map = ConcurrentHashMap<K, LinkedBlockingQueue<V>>()
+    private val watchers = ConcurrentHashMap<K, CopyOnWriteArraySet<Pair<(V) -> Boolean, CompletableFuture<V?>>>>()
     private val log = LoggerFactory.getLogger(WaitForMany::class.java)
 
     /**
@@ -14,6 +18,21 @@ class WaitForMany<K, V> {
      * Используется консюмером для передачи новых сообщений.
      */
     fun provide(key: K, value: V) {
+        watchers[key]?.let { watchersForKey ->
+            val delivered = ArrayList<Pair<(V) -> Boolean, CompletableFuture<V?>>>()
+            for (registration in watchersForKey) {
+                val (predicate, future) = registration
+                if (!future.isDone && predicate(value) && future.complete(value)) {
+                    delivered.add(registration)
+                }
+            }
+            if (delivered.isNotEmpty()) {
+                watchersForKey.removeAll(delivered)
+                if (watchersForKey.isEmpty()) {
+                    watchers.remove(key, watchersForKey)
+                }
+            }
+        }
         map.computeIfAbsent(key) { LinkedBlockingQueue() }.offer(value)
     }
 
@@ -95,11 +114,65 @@ class WaitForMany<K, V> {
     }
 
     /**
+     * Ожидает первое значение для [key], удовлетворяющее условию [predicate].
+     * Возвращает найденный элемент либо `null`, если таймаут истёк раньше.
+     */
+    fun waitForBatch(
+        key: K,
+        timeoutMs: Long,
+        predicate: (V) -> Boolean,
+    ): V? {
+        map[key]?.let { queue ->
+            for (value in queue) {
+                if (predicate(value)) {
+                    return value
+                }
+            }
+        }
+
+        val future = CompletableFuture<V?>()
+        val registration = predicate to future
+        val watchersForKey = watchers.computeIfAbsent(key) { CopyOnWriteArraySet() }
+        watchersForKey.add(registration)
+
+        map[key]?.let { queue ->
+            for (value in queue) {
+                if (predicate(value) && future.complete(value)) {
+                    watchersForKey.remove(registration)
+                    if (watchersForKey.isEmpty()) {
+                        watchers.remove(key, watchersForKey)
+                    }
+                    return value
+                }
+            }
+        }
+
+        val result = try {
+            future.get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) {
+            null
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            null
+        } finally {
+            if (!future.isDone) {
+                future.complete(null)
+            }
+            watchersForKey.remove(registration)
+            if (watchersForKey.isEmpty()) {
+                watchers.remove(key, watchersForKey)
+            }
+        }
+        return result
+    }
+
+    /**
      * Очищает очередь ожидания для указанного ключа [key].
      * Полезно для сброса состояния между тестами.
      */
     fun clear(key: K) {
         map.remove(key)
+        watchers.remove(key)?.forEach { (_, future) -> future.complete(null) }
     }
 }
 

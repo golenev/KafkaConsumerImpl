@@ -1,6 +1,7 @@
 package consumer.service
 
 import com.fasterxml.jackson.core.JsonProcessingException
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.consumer.CommitFailedException
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -94,9 +95,7 @@ class ConsumerKafkaService<T : Any>(
                 if (!records.isEmpty) {
                     records.forEach {
                         try {
-                            val value: T = mapper.readValue(it.value(), clazz)
-                            val k: String? = keySelector(value)
-                            if (k != null) waiter.provide(k, value)
+                            processRecordPayload(it.value())
                         } catch (e: JsonProcessingException) {
                             log.warn("JSON parse error at ${it.topic()}-${it.partition()}@${it.offset()}: ${e.message}")
                         }
@@ -150,6 +149,16 @@ class ConsumerKafkaService<T : Any>(
         key: String,
         timeoutMs: Long = 40_000,
     ): List<T> = waiter.waitNone(key, timeoutMs)
+
+    /**
+     * Ожидает сообщение для [key], удовлетворяющее условию [predicate].
+     * Возвращает найденный элемент или `null`, если истёк таймаут.
+     */
+    fun waitForBatch(
+        key: String,
+        timeoutMs: Long = 40_000,
+        predicate: (T) -> Boolean,
+    ): T? = waiter.waitForBatch(key, timeoutMs, predicate)
 
     /**
      * Останавливает цикл чтения из Kafka и завершает поток.
@@ -216,6 +225,23 @@ class ConsumerKafkaService<T : Any>(
      */
     private fun hasGroupId(): Boolean =
         (cfg.groupId != null) || (cfg.groupIdPrefix != null)
+
+    @Throws(JsonProcessingException::class)
+    private fun processRecordPayload(payload: String) {
+        val root = mapper.readTree(payload)
+        if (root.isArray) {
+            root.forEach { processSingleNode(it) }
+        } else {
+            processSingleNode(root)
+        }
+    }
+
+    @Throws(JsonProcessingException::class)
+    private fun processSingleNode(node: JsonNode) {
+        val value: T = mapper.treeToValue(node, clazz)
+        val k: String? = keySelector(value)
+        if (k != null) waiter.provide(k, value)
+    }
 }
 
 /**
