@@ -17,6 +17,7 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import com.validator.e2e.kafka.producer.ProducerKafkaService
+import com.validator.e2e.allure.step
 import configs.ValidatorTestObjectMapper
 import java.math.BigDecimal
 import java.time.OffsetDateTime
@@ -73,7 +74,8 @@ class ValidatorServiceE2eTests {
     fun `payload with typeAction 100 is enriched and forwarded`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
-        val payload = ValidationPayload(
+        val payload = step("Создать тело кафка сообщения") {
+            ValidationPayload(
             eventId = eventId,
             userId = "user-${UUID.randomUUID()}",
             officeId = officeId,
@@ -82,16 +84,23 @@ class ValidatorServiceE2eTests {
             sourceSystem = "validator-e2e",
             priority = 7,
             amount = BigDecimal("321.00"),
-        )
+            )
+        }
 
-        val headers = mapOf(
-            KafkaHeaderNames.IDEMPOTENCY_KEY to "idem-$eventId",
-            KafkaHeaderNames.MESSAGE_ID to "msg-$eventId",
-            KafkaHeaderNames.SOURCE_SYSTEM to "validator-e2e-tests"
-        )
-        producer.send(eventId, payload, headers)
+        val headers = step("Создать заголовки для кафка сообщения") {
+            mapOf(
+                KafkaHeaderNames.IDEMPOTENCY_KEY to "idem-$eventId",
+                KafkaHeaderNames.MESSAGE_ID to "msg-$eventId",
+                KafkaHeaderNames.SOURCE_SYSTEM to "validator-e2e-tests"
+            )
+        }
+        step("Отправить подготовленное кафка сообщение") {
+            producer.send(eventId, payload, headers)
+        }
 
-        val records = consumer.waitForKeyListWithHeaders(officeId.toString(), timeoutMs = 30_000, min = 1, max = 1)
+        val records = step("Дождаться обработанного кафка сообщения") {
+            consumer.waitForKeyListWithHeaders(officeId.toString(), timeoutMs = 30_000, min = 1, max = 1)
+        }
         records.shouldHaveSize(1)
         val validated = records.first().value
         val outboundHeaders = records.first().headers
@@ -120,7 +129,8 @@ class ValidatorServiceE2eTests {
     fun `payload with typeAction 300 produces two output messages`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
-        val payload = ValidationPayload(
+        val payload = step("Создать тело кафка сообщения") {
+            ValidationPayload(
             eventId = eventId,
             userId = "user-${UUID.randomUUID()}",
             officeId = officeId,
@@ -129,16 +139,23 @@ class ValidatorServiceE2eTests {
             sourceSystem = "validator-e2e",
             priority = 9,
             amount = BigDecimal("987.65"),
-        )
+            )
+        }
 
-        val headers = mapOf(
+        val headers = step("Создать заголовки для кафка сообщения") {
+            mapOf(
             KafkaHeaderNames.IDEMPOTENCY_KEY to "idem-$eventId",
             KafkaHeaderNames.MESSAGE_ID to "msg-$eventId",
             KafkaHeaderNames.SOURCE_SYSTEM to "validator-e2e-tests"
-        )
-        producer.send(eventId, payload, headers)
+            )
+        }
+        step("Отправить подготовленное кафка сообщение") {
+            producer.send(eventId, payload, headers)
+        }
 
-        val records = consumer.waitForKeyListWithHeaders(officeId.toString(), timeoutMs = 30_000, min = 2, max = 2)
+        val records = step("Дождаться обработанных кафка сообщений") {
+            consumer.waitForKeyListWithHeaders(officeId.toString(), timeoutMs = 30_000, min = 2, max = 2)
+        }
         records.shouldHaveSize(2)
         records.forEach { consumed ->
             val validated = consumed.value
@@ -169,7 +186,8 @@ class ValidatorServiceE2eTests {
     fun `payload with unsupported typeAction is skipped`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
-        val payload = ValidationPayload(
+        val payload = step("Создать тело кафка сообщения") {
+            ValidationPayload(
             eventId = eventId,
             userId = "user-${UUID.randomUUID()}",
             officeId = officeId,
@@ -178,19 +196,24 @@ class ValidatorServiceE2eTests {
             sourceSystem = "validator-e2e",
             priority = 5,
             amount = BigDecimal("123.45"),
-        )
+            )
+        }
 
-        producer.send(
-            eventId,
-            payload,
+        val headers = step("Создать заголовки для кафка сообщения") {
             mapOf(
                 KafkaHeaderNames.IDEMPOTENCY_KEY to "idem-$eventId",
                 KafkaHeaderNames.MESSAGE_ID to "msg-$eventId",
                 KafkaHeaderNames.SOURCE_SYSTEM to "validator-e2e-tests"
             )
-        )
+        }
 
-        val records = consumer.waitForKeyListAbsent(officeId.toString(), timeoutMs = 30_000)
+        step("Отправить подготовленное кафка сообщение") {
+            producer.send(eventId, payload, headers)
+        }
+
+        val records = step("Проверить отсутствие обработанных кафка сообщений") {
+            consumer.waitForKeyListAbsent(officeId.toString(), timeoutMs = 30_000)
+        }
         records.shouldBeEmpty()
     }
 
@@ -198,7 +221,8 @@ class ValidatorServiceE2eTests {
     fun `duplicate payload with same idempotency key is processed only once`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
-        val payload = ValidationPayload(
+        val payload = step("Создать тело кафка сообщения") {
+            ValidationPayload(
             eventId = eventId,
             userId = "user-${UUID.randomUUID()}",
             officeId = officeId,
@@ -207,18 +231,27 @@ class ValidatorServiceE2eTests {
             sourceSystem = "validator-e2e",
             priority = 10,
             amount = BigDecimal("555.55"),
-        )
+            )
+        }
 
-        val headers = mapOf(
+        val headers = step("Создать заголовки для кафка сообщения") {
+            mapOf(
             KafkaHeaderNames.IDEMPOTENCY_KEY to "idem-dedup-$eventId",
             KafkaHeaderNames.MESSAGE_ID to "msg-$eventId",
             KafkaHeaderNames.SOURCE_SYSTEM to "validator-e2e-tests"
-        )
+            )
+        }
 
-        producer.send(eventId, payload, headers)
-        producer.send(eventId, payload, headers)
+        step("Отправить первое подготовленное кафка сообщение") {
+            producer.send(eventId, payload, headers)
+        }
+        step("Отправить второе подготовленное кафка сообщение") {
+            producer.send(eventId, payload, headers)
+        }
 
-        val records = consumer.waitForKeyListWithHeaders(officeId.toString(), timeoutMs = 35_000, min = 1, max = 2)
+        val records = step("Дождаться обработанного кафка сообщения") {
+            consumer.waitForKeyListWithHeaders(officeId.toString(), timeoutMs = 35_000, min = 1, max = 2)
+        }
         records.shouldHaveSize(1)
         records.first().value.eventId shouldBe eventId
         records.first().headers[KafkaHeaderNames.IDEMPOTENCY_KEY] shouldBe headers[KafkaHeaderNames.IDEMPOTENCY_KEY]
