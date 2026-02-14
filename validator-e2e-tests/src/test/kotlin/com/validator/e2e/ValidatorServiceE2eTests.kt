@@ -17,6 +17,7 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import com.validator.e2e.kafka.producer.ProducerKafkaService
+import configs.ValidatorTestObjectMapper
 import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.util.UUID
