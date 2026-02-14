@@ -52,7 +52,9 @@ class ValidatorServiceBatchedOutputE2eTests {
                 awaitTopic = consumerSettings.batchedOutputTopic
                 awaitMapper = mapper
                 awaitClazz = ValidatedPayload::class.java
-                awaitLastNPerPartition = 0
+                // В batched-сценариях сервис публикует сообщения быстрее (без искусственных задержек),
+                // поэтому читаем последние N сообщений, чтобы избежать race при старте консюмера.
+                awaitLastNPerPartition = 200
             }
             batchedConsumer = runService(batchedConsumerConfig) { it.officeId.toString() }
             batchedConsumer.start()
@@ -61,7 +63,7 @@ class ValidatorServiceBatchedOutputE2eTests {
                 awaitTopic = consumerSettings.outputTopic
                 awaitMapper = mapper
                 awaitClazz = MissingHeadersPayload::class.java
-                awaitLastNPerPartition = 0
+                awaitLastNPerPartition = 200
             }
             missingHeadersConsumer = runService(missingHeadersConsumerConfig) { it.originalMessage.officeId.toString() }
             missingHeadersConsumer.start()

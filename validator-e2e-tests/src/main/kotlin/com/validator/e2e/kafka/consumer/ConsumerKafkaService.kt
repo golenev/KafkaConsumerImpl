@@ -106,7 +106,14 @@ class ConsumerKafkaService<T : Any>(
                             }
                             provideFromRecord(it.value(), headers)
                         } catch (e: JsonProcessingException) {
-                            log.warn("JSON parse error at ${it.topic()}-${it.partition()}@${it.offset()}: ${e.message}")
+                            log.debug(
+                                "Skip record at {}-{}@{} for targetType={} due to parse mismatch: {}",
+                                it.topic(),
+                                it.partition(),
+                                it.offset(),
+                                clazz.simpleName,
+                                e.message
+                            )
                         }
                     }
                     try {
