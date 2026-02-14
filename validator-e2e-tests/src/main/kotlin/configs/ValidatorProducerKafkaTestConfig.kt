@@ -1,6 +1,6 @@
 package configs
 
-import producer.service.ProducerKafkaConfig
+import com.validator.e2e.kafka.producer.ProducerKafkaConfig
 import java.util.UUID
 
 class ValidatorProducerKafkaSettings(

@@ -1,7 +1,7 @@
-package consumer
+package com.validator.e2e.kafka.examples
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import consumer.service.ConsumerKafkaConfig
+import com.validator.e2e.kafka.consumer.ConsumerKafkaConfig
 
 val someConsumerConfig: ConsumerKafkaConfig =
     ConsumerKafkaConfig(

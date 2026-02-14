@@ -1,4 +1,4 @@
-package consumer.service
+package com.validator.e2e.kafka.common
 
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import java.util.*

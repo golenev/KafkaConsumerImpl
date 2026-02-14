@@ -5,8 +5,8 @@ import com.validator.app.model.ValidatedPayload
 import com.validator.app.service.KafkaHeaderNames
 import configs.ValidatorConsumerKafkaSettings
 import configs.ValidatorProducerKafkaSettings
-import consumer.service.ConsumerKafkaService
-import consumer.service.runService
+import com.validator.e2e.kafka.consumer.ConsumerKafkaService
+import com.validator.e2e.kafka.consumer.runService
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -16,7 +16,8 @@ import io.kotest.matchers.string.shouldNotBeBlank
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
-import producer.service.ProducerKafkaService
+import com.validator.e2e.kafka.producer.ProducerKafkaService
+import configs.ValidatorTestObjectMapper
 import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.util.UUID

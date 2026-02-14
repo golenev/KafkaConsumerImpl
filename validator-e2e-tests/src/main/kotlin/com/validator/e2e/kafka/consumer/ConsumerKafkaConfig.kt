@@ -1,6 +1,7 @@
-package consumer.service
+package com.validator.e2e.kafka.consumer
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.validator.e2e.kafka.common.KafkaConfig
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
 import java.util.*
