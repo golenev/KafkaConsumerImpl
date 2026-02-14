@@ -1,4 +1,4 @@
-package consumer.service
+package com.validator.e2e.kafka.consumer
 
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap

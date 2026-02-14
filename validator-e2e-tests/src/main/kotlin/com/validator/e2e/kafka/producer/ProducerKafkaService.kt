@@ -1,4 +1,4 @@
-package producer.service
+package com.validator.e2e.kafka.producer
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.producer.KafkaProducer

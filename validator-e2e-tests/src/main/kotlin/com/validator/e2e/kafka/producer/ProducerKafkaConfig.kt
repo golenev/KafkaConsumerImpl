@@ -1,6 +1,6 @@
-package producer.service
+package com.validator.e2e.kafka.producer
 
-import consumer.service.KafkaConfig
+import com.validator.e2e.kafka.common.KafkaConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.StringSerializer
 import java.util.Properties

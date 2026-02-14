@@ -1,6 +1,6 @@
 package configs
 
-import consumer.service.ConsumerKafkaConfig
+import com.validator.e2e.kafka.consumer.ConsumerKafkaConfig
 
 class ValidatorConsumerKafkaSettings(
     val bootstrapServers: String = "localhost:9092",
