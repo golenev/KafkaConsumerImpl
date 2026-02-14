@@ -72,7 +72,7 @@ class ValidatorServiceE2eTests {
     }
 
     @Test
-    @DisplayName("Обогатить и переслать одно сообщение с typeAction 100")
+    @DisplayName("Проверка, что при входном сообщении с typeAction 100 система обогащает данные и отправляет одно сообщение в выходной топик")
     fun `payload with typeAction 100 is enriched and forwarded`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
@@ -139,7 +139,7 @@ class ValidatorServiceE2eTests {
     }
 
     @Test
-    @DisplayName("Сформировать два выходных сообщения для сценария typeAction 300")
+    @DisplayName("Проверка, что при входном сообщении с typeAction 300 система формирует два выходных сообщения с ожидаемыми полями")
     fun `payload with typeAction 300 produces two output messages`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
@@ -211,7 +211,7 @@ class ValidatorServiceE2eTests {
     }
 
     @Test
-    @DisplayName("Пропустить сообщение с неподдерживаемым typeAction 200 без выхода в output")
+    @DisplayName("Проверка, что при входном сообщении с неподдерживаемым typeAction 200 система не публикует результат в выходной топик")
     fun `payload with unsupported typeAction is skipped`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
@@ -251,7 +251,7 @@ class ValidatorServiceE2eTests {
     }
 
     @Test
-    @DisplayName("Обработать только один экземпляр при дублировании сообщения с одинаковым idempotency key")
+    @DisplayName("Проверка, что при повторной отправке сообщения с одинаковым idempotency key система обрабатывает только первый экземпляр")
     fun `duplicate payload with same idempotency key is processed only once`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
