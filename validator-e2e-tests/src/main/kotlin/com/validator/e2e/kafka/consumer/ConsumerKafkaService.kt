@@ -75,6 +75,14 @@ class ConsumerKafkaService<T : Any>(
             throw ex
         }
         threadRef = thread(name = "kafka-await-$topic", start = true) { run() }
+        log.info(
+            "Started ConsumerKafkaService topic={} targetType={} groupMode={} groupId={} groupIdPrefix={}",
+            topic,
+            clazz.simpleName,
+            if (hasGroupId()) "subscribe" else "assign",
+            cfg.groupId,
+            cfg.groupIdPrefix
+        )
     }
 
 
@@ -88,22 +96,40 @@ class ConsumerKafkaService<T : Any>(
             if (hasGroupId()) {
                 consumer.subscribe(listOf(topic))
                 waitForAssignment()
+                log.info("Assigned partitions for topic {}: {}", topic, consumer.assignment())
                 positionToTailOrLastN(consumer.assignment().toList())
             } else {
                 val infos = consumer.partitionsFor(topic) ?: emptyList()
                 val tps = infos.map { TopicPartition(topic, it.partition()) }
                 consumer.assign(tps)
+                log.info("Assigned partitions manually for topic {}: {}", topic, tps)
                 positionToTailOrLastN(tps)
             }
 
             while (isRunningNow.get()) {
                 val records = consumer.poll(Duration.ofMillis(300))
                 if (!records.isEmpty) {
+                    log.info(
+                        "Polled {} record(s) from topic={} for targetType={} (groupMode={})",
+                        records.count(),
+                        topic,
+                        clazz.simpleName,
+                        if (hasGroupId()) "subscribe" else "assign"
+                    )
                     records.forEach {
                         try {
                             val headers = it.headers().associate { header ->
                                 header.key() to String(header.value() ?: ByteArray(0), StandardCharsets.UTF_8)
                             }
+                            log.info(
+                                "Record received topic={} partition={} offset={} key={} headers={} valuePreview={}",
+                                it.topic(),
+                                it.partition(),
+                                it.offset(),
+                                it.key(),
+                                headers,
+                                it.value().take(200)
+                            )
                             provideFromRecord(it.value(), headers)
                         } catch (e: JsonProcessingException) {
                             log.debug(
@@ -172,6 +198,18 @@ class ConsumerKafkaService<T : Any>(
             if (k != null) {
                 waiter.provide(k, value)
                 waiterWithHeaders.provide(k, ConsumedMessage(value, headers))
+                log.info(
+                    "Provided single item for key={} targetType={} headers={}",
+                    k,
+                    clazz.simpleName,
+                    headers
+                )
+            } else {
+                log.warn(
+                    "Parsed single item for targetType={} but keySelector returned null. Payload={}",
+                    clazz.simpleName,
+                    value
+                )
             }
         }
     }
@@ -238,6 +276,8 @@ class ConsumerKafkaService<T : Any>(
         if (tps.isEmpty()) return
         if (lastNPerPartition <= 0) {
             consumer.seekToEnd(tps)
+            val positions = tps.associateWith { consumer.position(it) }
+            log.info("Positioned consumer to tail for topic {} positions={}", topic, positions)
             return
         }
         val begin = consumer.beginningOffsets(tps.toSet())
@@ -250,6 +290,15 @@ class ConsumerKafkaService<T : Any>(
             val start = maxOf(b, e - n)
             consumer.seek(it, start)
         }
+        val positions = tps.associateWith { consumer.position(it) }
+        log.info(
+            "Positioned consumer to lastN topic={} lastNPerPartition={} positions={} begin={} end={}",
+            topic,
+            lastNPerPartition,
+            positions,
+            begin,
+            end
+        )
     }
 
     /**

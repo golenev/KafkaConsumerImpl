@@ -21,12 +21,15 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.util.UUID
 import kotlin.random.Random
 
 class ValidatorServiceE2eTests {
+
+    private val log = LoggerFactory.getLogger(ValidatorServiceE2eTests::class.java)
 
     companion object {
         private lateinit var producer: ProducerKafkaService<ValidationPayload>
@@ -334,11 +337,25 @@ class ValidatorServiceE2eTests {
         }
 
         step("Отправить сообщение в input-топик без заголовков") {
+            log.info(
+                "Sending payload without headers eventId={} officeId={} expectedKey={} payload={}",
+                eventId,
+                officeId,
+                officeId,
+                payload
+            )
             producer.sendMessageToKafka(eventId, payload, emptyMap())
         }
 
         val records = step("Дождаться сообщения об отсутствии заголовков в output-топике") {
-            missingHeadersConsumer.waitForKeyList(officeId.toString(), timeoutMs = 30_000, min = 1, max = 1)
+            val waited = missingHeadersConsumer.waitForKeyList(officeId.toString(), timeoutMs = 30_000, min = 1, max = 1)
+            log.info(
+                "missingHeadersConsumer returned {} record(s) for officeId={} records={}",
+                waited.size,
+                officeId,
+                waited
+            )
+            waited
         }
 
         val response = step("Выбрать единственное сообщение-ошибку") {

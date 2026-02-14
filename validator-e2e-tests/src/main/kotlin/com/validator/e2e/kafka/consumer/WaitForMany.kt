@@ -34,6 +34,15 @@ class WaitForMany<K, V> {
         val out = ArrayList<V>(min.coerceAtLeast(1))
         val deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
 
+        log.info(
+            "Start waiting for key={} timeoutMs={} min={} max={} initialQueueSize={}",
+            key,
+            timeoutMs,
+            min,
+            max,
+            q.size
+        )
+
         while (System.nanoTime() < deadlineNs && out.size < max) {
             val remNs = deadlineNs - System.nanoTime()
             log.debug(
@@ -57,7 +66,7 @@ class WaitForMany<K, V> {
                     max
                 )
                 if (out.size >= min) {
-                    log.debug(
+                    log.info(
                         "Minimum threshold reached for key={} -> returning {} item(s)",
                         key,
                         out.size
@@ -75,6 +84,18 @@ class WaitForMany<K, V> {
                 break
             }
         }
+
+        val knownQueueSizes = map.entries
+            .associate { it.key.toString() to it.value.size }
+            .toString()
+        log.warn(
+            "Wait finished for key={} with {} item(s), expected min={} max={}, knownQueues={}",
+            key,
+            out.size,
+            min,
+            max,
+            knownQueueSizes
+        )
         return out
     }
 
@@ -102,4 +123,3 @@ class WaitForMany<K, V> {
         map.remove(key)
     }
 }
-
