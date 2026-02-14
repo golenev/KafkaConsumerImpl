@@ -3,6 +3,9 @@ package com.validator.e2e.kafka.examples
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.validator.e2e.kafka.consumer.ConsumerKafkaConfig
 
+/**
+ * example
+ */
 val someConsumerConfig: ConsumerKafkaConfig =
     ConsumerKafkaConfig(
         bootstrapServers = "",

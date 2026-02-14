@@ -19,7 +19,7 @@ class ValidatorConsumerKafkaSettings(
         ).apply {
             securityProtocol = this@ValidatorConsumerKafkaSettings.securityProtocol
             this@ValidatorConsumerKafkaSettings.saslMechanism?.let { saslMechanism = it }
-            groupIdPrefix = "validator-e2e-"
+           // groupIdPrefix = "validator-e2e-" опционально
             autoCommit = false
         }
 }
