@@ -18,9 +18,11 @@
 
 1. Запустите Spring-приложение, вызвав `fun main(args: Array<String>) { runApplication<ValidatorApplication>(*args) }` из `validator-service/src/main/kotlin/com/validator/app/ValidatorApplication.kt`. Это можно сделать из IDE или командой `./gradlew :validator-service:bootRun`.
 2. Поднимите инфраструктуру Kafka и Redpanda Console: `docker compose up -d`. Файл `docker-compose.yml` расположен в корне репозитория.
-3. Откройте веб-интерфейс Redpanda Console по адресу http://localhost:9000, чтобы убедиться, что брокер доступен и топики созданы.
+3. Откройте веб-интерфейс Redpanda Console по адресу `http://localhost:${REDPANDA_CONSOLE_PORT:-9000}` (по умолчанию `http://localhost:9000`), чтобы убедиться, что брокер доступен и топики созданы.
 
 ## Проверка логики через тесты и Redpanda Console
+
+> Если `docker compose up -d` падает с ошибкой `container name ... is already in use`, это конфликт имени контейнера между проектами. В текущем `docker-compose.yml` имя контейнера для Redpanda Console не фиксируется, поэтому конфликтов по имени быть не должно. Если занят именно порт на хосте, запустите с другим портом: `REDPANDA_CONSOLE_PORT=9001 docker compose up -d`.
 
 Интеграционные тесты модуля `validator-e2e-tests` поднимают сервис, публикуют события и считывают ответы из Kafka. Наблюдая за выполнением тестов и параллельно отслеживая очереди в Redpanda Console, можно проследить весь жизненный цикл сообщения: от REST-запроса до появления валидированного события в выходном топике, проверить задержки и убедиться, что сервис корректно коммитит смещения.
 
