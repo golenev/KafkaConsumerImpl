@@ -4,7 +4,7 @@ import com.validator.app.model.MissingHeadersPayload
 import com.validator.app.model.ValidatedPayload
 import com.validator.app.model.ValidationPayload
 import com.validator.app.service.KafkaHeaderNames
-import com.validator.e2e.allure.step
+import com.validator.e2e.tests.step
 import com.validator.e2e.kafka.consumer.ConsumerKafkaService
 import com.validator.e2e.kafka.consumer.runService
 import com.validator.e2e.kafka.producer.ProducerKafkaService

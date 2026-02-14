@@ -1,4 +1,4 @@
-package com.validator.e2e.allure
+package com.validator.e2e.tests
 
 import io.qameta.allure.Allure
 
