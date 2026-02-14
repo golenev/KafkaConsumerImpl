@@ -2,7 +2,7 @@ package com.validator.e2e
 
 import com.validator.app.model.ValidationPayload
 import com.validator.app.model.ValidatedPayload
-import com.fasterxml.jackson.databind.JsonNode
+import com.validator.app.model.MissingHeadersPayload
 import com.validator.app.service.KafkaHeaderNames
 import com.validator.e2e.allure.step
 import com.validator.e2e.kafka.consumer.ConsumerKafkaService
@@ -31,7 +31,7 @@ class ValidatorServiceE2eTests {
     companion object {
         private lateinit var producer: ProducerKafkaService<ValidationPayload>
         private lateinit var consumer: ConsumerKafkaService<ValidatedPayload>
-        private lateinit var missingHeadersConsumer: ConsumerKafkaService<JsonNode>
+        private lateinit var missingHeadersConsumer: ConsumerKafkaService<MissingHeadersPayload>
         private val producerSettings = ValidatorProducerKafkaSettings()
         private val consumerSettings = ValidatorConsumerKafkaSettings()
         private val mapper = ValidatorTestObjectMapper.globalMapper
@@ -60,12 +60,12 @@ class ValidatorServiceE2eTests {
             val missingHeadersConsumerConfig = consumerSettings.createConsumerConfig().apply {
                 awaitTopic = consumerSettings.outputTopic
                 awaitMapper = mapper
-                awaitClazz = JsonNode::class.java
+                awaitClazz = MissingHeadersPayload::class.java
                 awaitLastNPerPartition = 0
             }
 
             missingHeadersConsumer = runService(missingHeadersConsumerConfig) {
-                it.path("originalMessage").path("officeId").asText()
+                it.originalMessage.officeId.toString()
             }
             missingHeadersConsumer.start()
 
@@ -350,17 +350,17 @@ class ValidatorServiceE2eTests {
         }
 
         step("Проверить структуру и содержимое JSON при отсутствии заголовков") {
-            response.path("message").asText() shouldBe "Kafka message does not contain headers"
+            response.message shouldBe "Kafka message does not contain headers"
 
-            val original = response.path("originalMessage")
-            original.path("eventId").asText() shouldBe payload.eventId
-            original.path("userId").asText() shouldBe payload.userId
-            original.path("officeId").asLong() shouldBe payload.officeId
-            original.path("type_action").asInt() shouldBe payload.typeAction
-            original.path("status").asText() shouldBe payload.status
-            original.path("sourceSystem").asText() shouldBe payload.sourceSystem
-            original.path("priority").asInt() shouldBe payload.priority
-            original.path("amount").asText() shouldBe payload.amount.toString()
+            val original = response.originalMessage
+            original.eventId shouldBe payload.eventId
+            original.userId shouldBe payload.userId
+            original.officeId shouldBe payload.officeId
+            original.typeAction shouldBe payload.typeAction
+            original.status shouldBe payload.status
+            original.sourceSystem shouldBe payload.sourceSystem
+            original.priority shouldBe payload.priority
+            original.amount shouldBe payload.amount
         }
     }
 
