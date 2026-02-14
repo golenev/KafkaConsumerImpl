@@ -39,7 +39,7 @@ class ValidatorService(
     fun onMessage(record: ConsumerRecord<String, ValidationPayload>, acknowledgment: Acknowledgment) {
         val payload = record.value()
 
-        if (record.headers().toArray().isEmpty()) {
+        if (record.headers().toArray().isEmpty() || hasNoBusinessHeaders(record)) {
             val missingHeadersPayload = MissingHeadersPayload(
                 message = "Kafka message does not contain headers",
                 originalMessage = payload
@@ -146,6 +146,21 @@ class ValidatorService(
         )
         val secondary = createValidatedPayload(secondarySource)
         return listOf(primary, secondary)
+    }
+
+
+    private fun hasNoBusinessHeaders(record: ConsumerRecord<String, ValidationPayload>): Boolean {
+        val businessHeaderKeys = listOf(
+            KafkaHeaderNames.IDEMPOTENCY_KEY,
+            KafkaHeaderNames.MESSAGE_ID,
+            KafkaHeaderNames.SOURCE_SYSTEM
+        )
+        return businessHeaderKeys.none { hasNonBlankHeader(record, it) }
+    }
+
+    private fun hasNonBlankHeader(record: ConsumerRecord<String, ValidationPayload>, key: String): Boolean {
+        val headerValue = headerOrDefault(record, key, "")
+        return headerValue.isNotBlank()
     }
 
     private fun headerOrDefault(record: ConsumerRecord<String, ValidationPayload>, key: String, default: String): String {
