@@ -5,6 +5,7 @@ import com.validator.e2e.kafka.consumer.ConsumerKafkaConfig
 class ValidatorConsumerKafkaSettings(
     val bootstrapServers: String = "localhost:9092",
     val outputTopic: String = "out_validator",
+    val batchedOutputTopic: String = "batched_output",
     val username: String? = "validator-user",
     val password: String? = "validator-password",
     val securityProtocol: String = "PLAINTEXT",
