@@ -1,9 +1,9 @@
 package com.validator.app.service
 
 import com.validator.app.config.ValidatorTopicsProperties
-import com.validator.app.model.ValidationPayload
 import com.validator.app.model.MissingHeadersPayload
 import com.validator.app.model.ValidatedPayload
+import com.validator.app.model.ValidationPayload
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
@@ -12,8 +12,8 @@ import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.Acknowledgment
 import org.springframework.stereotype.Service
-import java.nio.charset.StandardCharsets
 import java.lang.Thread.sleep
+import java.nio.charset.StandardCharsets
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -31,6 +31,7 @@ class ValidatorService(
     private val logger = LoggerFactory.getLogger(ValidatorService::class.java)
     private val formatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME
     private val processedIdempotencyKeys: MutableSet<String> = Collections.newSetFromMap(ConcurrentHashMap())
+    private val batchedPayloadBuffer = mutableListOf<ValidatedPayload>()
 
     @KafkaListener(
         topics = ["\${validator.topics.input}"],
@@ -71,6 +72,12 @@ class ValidatorService(
                 acknowledgment.acknowledge()
                 return
             }
+        }
+
+        if (record.key() == WITH_BATCH_KEY) {
+            sendToBatchedOutput(validatedPayloads, idempotencyKey, sourceSystem, payload.eventId)
+            acknowledgment.acknowledge()
+            return
         }
 
         if (payload.typeAction == 300) {
@@ -124,6 +131,57 @@ class ValidatorService(
         acknowledgment.acknowledge()
     }
 
+    private fun sendToBatchedOutput(
+        validatedPayloads: List<ValidatedPayload>,
+        idempotencyKey: String,
+        sourceSystem: String,
+        eventId: String,
+    ) {
+        synchronized(batchedPayloadBuffer) {
+            batchedPayloadBuffer.addAll(validatedPayloads)
+            while (batchedPayloadBuffer.size >= BATCH_SIZE) {
+                val batch = batchedPayloadBuffer.take(BATCH_SIZE)
+                repeat(BATCH_SIZE) { batchedPayloadBuffer.removeAt(0) }
+
+                val producerRecord = ProducerRecord(topicsProperties.batchedOutput, WITH_BATCH_KEY, batch as Any).apply {
+                    headers().add(
+                        RecordHeader(
+                            KafkaHeaderNames.IDEMPOTENCY_KEY,
+                            idempotencyKey.toByteArray(StandardCharsets.UTF_8)
+                        )
+                    )
+                    headers().add(
+                        RecordHeader(
+                            KafkaHeaderNames.MESSAGE_ID,
+                            UUID.randomUUID().toString().toByteArray(StandardCharsets.UTF_8)
+                        )
+                    )
+                    headers().add(
+                        RecordHeader(
+                            KafkaHeaderNames.SOURCE_SYSTEM,
+                            sourceSystem.toByteArray(StandardCharsets.UTF_8)
+                        )
+                    )
+                    headers().add(
+                        RecordHeader(
+                            KafkaHeaderNames.PROCESSED_AT,
+                            OffsetDateTime.now(ZoneOffset.UTC).format(formatter).toByteArray(StandardCharsets.UTF_8)
+                        )
+                    )
+                }
+
+                kafkaTemplate.send(producerRecord)
+                logger.info(
+                    "Forwarded validated batch with {} items to {} (triggerEventId={}, idempotencyKey={})",
+                    batch.size,
+                    topicsProperties.batchedOutput,
+                    eventId,
+                    idempotencyKey
+                )
+            }
+        }
+    }
+
     private fun createValidatedPayload(payload: ValidationPayload) =
         ValidatedPayload(
             eventId = payload.eventId,
@@ -138,33 +196,34 @@ class ValidatorService(
         )
 
     private fun createDuplicateValidatedPayloads(payload: ValidationPayload): List<ValidatedPayload> {
-        val primary = createValidatedPayload(payload)
-        val secondarySource = payload.copy(
+        val first = createValidatedPayload(payload)
+        val second = createValidatedPayload(payload).copy(
             eventId = "${payload.eventId}-secondary",
             userId = "${payload.userId}-secondary",
             priority = payload.priority + 1
         )
-        val secondary = createValidatedPayload(secondarySource)
-        return listOf(primary, secondary)
+        return listOf(first, second)
     }
-
 
     private fun hasNoBusinessHeaders(record: ConsumerRecord<String, ValidationPayload>): Boolean {
-        val businessHeaderKeys = listOf(
-            KafkaHeaderNames.IDEMPOTENCY_KEY,
-            KafkaHeaderNames.MESSAGE_ID,
-            KafkaHeaderNames.SOURCE_SYSTEM
-        )
-        return businessHeaderKeys.none { hasNonBlankHeader(record, it) }
+        val headers = record.headers()
+
+        val hasIdempotency = headers.lastHeader(KafkaHeaderNames.IDEMPOTENCY_KEY) != null
+        val hasMessageId = headers.lastHeader(KafkaHeaderNames.MESSAGE_ID) != null
+        val hasSourceSystem = headers.lastHeader(KafkaHeaderNames.SOURCE_SYSTEM) != null
+
+        return !hasIdempotency && !hasMessageId && !hasSourceSystem
     }
 
-    private fun hasNonBlankHeader(record: ConsumerRecord<String, ValidationPayload>, key: String): Boolean {
-        val headerValue = headerOrDefault(record, key, "")
-        return headerValue.isNotBlank()
+    private fun headerOrDefault(record: ConsumerRecord<String, ValidationPayload>, headerName: String, default: String): String {
+        val header = record.headers().lastHeader(headerName) ?: return default
+        val bytes = header.value() ?: return default
+        val value = bytes.toString(StandardCharsets.UTF_8)
+        return value.ifBlank { default }
     }
 
-    private fun headerOrDefault(record: ConsumerRecord<String, ValidationPayload>, key: String, default: String): String {
-        val header = record.headers().lastHeader(key) ?: return default
-        return String(header.value() ?: ByteArray(0), StandardCharsets.UTF_8)
+    companion object {
+        private const val WITH_BATCH_KEY = "withBatch"
+        private const val BATCH_SIZE = 10
     }
 }

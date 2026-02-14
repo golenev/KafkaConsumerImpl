@@ -219,4 +219,11 @@ class ValidatorKafkaConfig {
             .partitions(topicsProperties.partitions)
             .replicas(topicsProperties.replicationFactor.toInt())
             .build()
+
+    @Bean
+    fun batchedOutputTopic(topicsProperties: ValidatorTopicsProperties): NewTopic =
+        TopicBuilder.name(topicsProperties.batchedOutput)
+            .partitions(topicsProperties.partitions)
+            .replicas(topicsProperties.replicationFactor.toInt())
+            .build()
 }

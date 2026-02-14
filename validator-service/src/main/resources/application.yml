@@ -14,6 +14,7 @@ validator:
   topics:
     input: in_validator
     output: out_validator
+    batched-output: batched_output
     partitions: 3
     replication-factor: 1
 

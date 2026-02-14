@@ -9,6 +9,8 @@ data class ValidatorTopicsProperties(
     val input: String,
     @DefaultValue("out_validator")
     val output: String,
+    @DefaultValue("batched_output")
+    val batchedOutput: String,
     @DefaultValue("3")
     val partitions: Int,
     @DefaultValue("1")
