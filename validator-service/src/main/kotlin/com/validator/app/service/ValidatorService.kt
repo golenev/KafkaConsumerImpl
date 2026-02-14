@@ -2,6 +2,7 @@ package com.validator.app.service
 
 import com.validator.app.config.ValidatorTopicsProperties
 import com.validator.app.model.ValidationPayload
+import com.validator.app.model.MissingHeadersPayload
 import com.validator.app.model.ValidatedPayload
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
@@ -24,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap
 @Service
 class ValidatorService(
     private val topicsProperties: ValidatorTopicsProperties,
-    private val kafkaTemplate: KafkaTemplate<String, ValidatedPayload>,
+    private val kafkaTemplate: KafkaTemplate<String, Any>,
 ) {
 
     private val logger = LoggerFactory.getLogger(ValidatorService::class.java)
@@ -37,6 +38,19 @@ class ValidatorService(
     )
     fun onMessage(record: ConsumerRecord<String, ValidationPayload>, acknowledgment: Acknowledgment) {
         val payload = record.value()
+
+        if (record.headers().toArray().isEmpty() || hasNoBusinessHeaders(record)) {
+            val missingHeadersPayload = MissingHeadersPayload(
+                message = "Kafka message does not contain headers",
+                originalMessage = payload
+            )
+            val producerRecord = ProducerRecord(topicsProperties.output, payload.officeId.toString(), missingHeadersPayload as Any)
+            kafkaTemplate.send(producerRecord)
+            logger.warn("Forwarded missing headers payload for eventId={} to {}", payload.eventId, topicsProperties.output)
+            acknowledgment.acknowledge()
+            return
+        }
+
         val idempotencyKey = headerOrDefault(record, KafkaHeaderNames.IDEMPOTENCY_KEY, payload.eventId)
         if (!processedIdempotencyKeys.add(idempotencyKey)) {
             logger.info("Skip duplicate payload with eventId={} and idempotencyKey={}", payload.eventId, idempotencyKey)
@@ -69,7 +83,7 @@ class ValidatorService(
                 val randomPauseValue = Random().nextLong(10000, 15000)
                 sleep(randomPauseValue)
             }
-            val producerRecord = ProducerRecord(topicsProperties.output, payload.eventId, validated).apply {
+            val producerRecord = ProducerRecord(topicsProperties.output, payload.eventId, validated as Any).apply {
                 headers().add(
                     RecordHeader(
                         KafkaHeaderNames.IDEMPOTENCY_KEY,
@@ -132,6 +146,21 @@ class ValidatorService(
         )
         val secondary = createValidatedPayload(secondarySource)
         return listOf(primary, secondary)
+    }
+
+
+    private fun hasNoBusinessHeaders(record: ConsumerRecord<String, ValidationPayload>): Boolean {
+        val businessHeaderKeys = listOf(
+            KafkaHeaderNames.IDEMPOTENCY_KEY,
+            KafkaHeaderNames.MESSAGE_ID,
+            KafkaHeaderNames.SOURCE_SYSTEM
+        )
+        return businessHeaderKeys.none { hasNonBlankHeader(record, it) }
+    }
+
+    private fun hasNonBlankHeader(record: ConsumerRecord<String, ValidationPayload>, key: String): Boolean {
+        val headerValue = headerOrDefault(record, key, "")
+        return headerValue.isNotBlank()
     }
 
     private fun headerOrDefault(record: ConsumerRecord<String, ValidationPayload>, key: String, default: String): String {

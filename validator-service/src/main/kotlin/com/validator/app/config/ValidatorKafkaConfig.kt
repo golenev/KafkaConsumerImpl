@@ -73,9 +73,9 @@ class ValidatorKafkaConfig {
     fun validatedPayloadProducerFactory(
         kafkaProperties: ValidatorKafkaProperties,
         objectMapper: ObjectMapper
-    ): ProducerFactory<String, ValidatedPayload> {
+    ): ProducerFactory<String, Any> {
         val props = baseProducerProps(kafkaProperties)
-        return DefaultKafkaProducerFactory(props, StringSerializer(), JsonSerializer<ValidatedPayload>(objectMapper).apply {
+        return DefaultKafkaProducerFactory(props, StringSerializer(), JsonSerializer<Any>(objectMapper).apply {
             setAddTypeInfo(false)
         })
     }
@@ -98,8 +98,8 @@ class ValidatorKafkaConfig {
 
     @Bean
     fun validatedKafkaTemplate(
-        validatedPayloadProducerFactory: ProducerFactory<String, ValidatedPayload>
-    ): KafkaTemplate<String, ValidatedPayload> = KafkaTemplate(validatedPayloadProducerFactory)
+        validatedPayloadProducerFactory: ProducerFactory<String, Any>
+    ): KafkaTemplate<String, Any> = KafkaTemplate(validatedPayloadProducerFactory)
 
     @Bean
     fun validationConsumerFactory(
@@ -220,4 +220,3 @@ class ValidatorKafkaConfig {
             .replicas(topicsProperties.replicationFactor.toInt())
             .build()
 }
-
