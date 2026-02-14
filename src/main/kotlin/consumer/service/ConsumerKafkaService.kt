@@ -11,9 +11,15 @@ import org.apache.kafka.common.errors.AuthenticationException
 import org.apache.kafka.common.errors.WakeupException
 import org.slf4j.LoggerFactory
 import java.time.Duration
+import java.nio.charset.StandardCharsets
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
+
+data class ConsumedMessage<T>(
+    val value: T,
+    val headers: Map<String, String>,
+)
 
 class ConsumerKafkaService<T : Any>(
     private val cfg: ConsumerKafkaConfig,
@@ -31,6 +37,7 @@ class ConsumerKafkaService<T : Any>(
      */
     private val isRunningNow = AtomicBoolean(false)
     private val waiter = WaitForMany<String, T>()
+    private val waiterWithHeaders = WaitForMany<String, ConsumedMessage<T>>()
     private lateinit var consumer: KafkaConsumer<String, String>
     private var threadRef: Thread? = null
     private val topic: String = cfg.awaitTopic
@@ -96,7 +103,13 @@ class ConsumerKafkaService<T : Any>(
                         try {
                             val value: T = mapper.readValue(it.value(), clazz)
                             val k: String? = keySelector(value)
-                            if (k != null) waiter.provide(k, value)
+                            if (k != null) {
+                                waiter.provide(k, value)
+                                val headers = it.headers().associate { header ->
+                                    header.key() to String(header.value() ?: ByteArray(0), StandardCharsets.UTF_8)
+                                }
+                                waiterWithHeaders.provide(k, ConsumedMessage(value, headers))
+                            }
                         } catch (e: JsonProcessingException) {
                             log.warn("JSON parse error at ${it.topic()}-${it.partition()}@${it.offset()}: ${e.message}")
                         }
@@ -150,6 +163,13 @@ class ConsumerKafkaService<T : Any>(
         key: String,
         timeoutMs: Long = 40_000,
     ): List<T> = waiter.waitNone(key, timeoutMs)
+
+    fun waitForKeyListWithHeaders(
+        key: String,
+        timeoutMs: Long = 40_000,
+        min: Int = 1,
+        max: Int = Int.MAX_VALUE,
+    ): List<ConsumedMessage<T>> = waiterWithHeaders.waitMany(key, timeoutMs, min, max)
 
     /**
      * Останавливает цикл чтения из Kafka и завершает поток.
