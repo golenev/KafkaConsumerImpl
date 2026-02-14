@@ -43,3 +43,9 @@ data class ValidatedPayload(
     val amount: BigDecimal?,
     val validatedAtIso: String
 )
+
+
+data class MissingHeadersPayload(
+    val message: String,
+    val originalMessage: ValidationPayload
+)

@@ -2,6 +2,7 @@ package com.validator.e2e
 
 import com.validator.app.model.ValidationPayload
 import com.validator.app.model.ValidatedPayload
+import com.fasterxml.jackson.databind.JsonNode
 import com.validator.app.service.KafkaHeaderNames
 import com.validator.e2e.allure.step
 import com.validator.e2e.kafka.consumer.ConsumerKafkaService
@@ -30,6 +31,7 @@ class ValidatorServiceE2eTests {
     companion object {
         private lateinit var producer: ProducerKafkaService<ValidationPayload>
         private lateinit var consumer: ConsumerKafkaService<ValidatedPayload>
+        private lateinit var missingHeadersConsumer: ConsumerKafkaService<JsonNode>
         private val producerSettings = ValidatorProducerKafkaSettings()
         private val consumerSettings = ValidatorConsumerKafkaSettings()
         private val mapper = ValidatorTestObjectMapper.globalMapper
@@ -55,7 +57,19 @@ class ValidatorServiceE2eTests {
             consumer = runService(consumerConfig) { it.officeId.toString() }
             consumer.start()
 
-            // небольшая пауза, чтобы консюмер успел подписаться на топик до начала теста
+            val missingHeadersConsumerConfig = consumerSettings.createConsumerConfig().apply {
+                awaitTopic = consumerSettings.outputTopic
+                awaitMapper = mapper
+                awaitClazz = JsonNode::class.java
+                awaitLastNPerPartition = 0
+            }
+
+            missingHeadersConsumer = runService(missingHeadersConsumerConfig) {
+                it.path("originalMessage").path("officeId").asText()
+            }
+            missingHeadersConsumer.start()
+
+            // небольшая пауза, чтобы консюмеры успели подписаться на топик до начала теста
             Thread.sleep(500)
         }
 
@@ -67,6 +81,9 @@ class ValidatorServiceE2eTests {
             }
             if (::consumer.isInitialized) {
                 consumer.close()
+            }
+            if (::missingHeadersConsumer.isInitialized) {
+                missingHeadersConsumer.close()
             }
         }
     }
@@ -298,4 +315,53 @@ class ValidatorServiceE2eTests {
             records.first().headers[KafkaHeaderNames.IDEMPOTENCY_KEY] shouldBe headers[KafkaHeaderNames.IDEMPOTENCY_KEY]
         }
     }
+
+
+    @Test
+    @DisplayName("Проверка, что при отсутствии заголовков во входном Kafka-сообщении публикуется JSON с ошибкой и исходным сообщением")
+    fun `payload without headers is forwarded as error json with original message`() {
+        val officeId = Random.nextLong(1, Long.MAX_VALUE)
+        val eventId = UUID.randomUUID().toString()
+
+        val payload = step("Сформировать входное сообщение без Kafka-заголовков") {
+            ValidationPayload(
+                eventId = eventId,
+                userId = "user-${UUID.randomUUID()}",
+                officeId = officeId,
+                typeAction = 100,
+                status = "NEW",
+                sourceSystem = "validator-e2e",
+                priority = 3,
+                amount = BigDecimal("42.00"),
+            )
+        }
+
+        step("Отправить сообщение в input-топик без заголовков") {
+            producer.sendMessageToKafka(eventId, payload, emptyMap())
+        }
+
+        val records = step("Дождаться сообщения об отсутствии заголовков в output-топике") {
+            missingHeadersConsumer.waitForKeyList(officeId.toString(), timeoutMs = 30_000, min = 1, max = 1)
+        }
+
+        val response = step("Выбрать единственное сообщение-ошибку") {
+            records.shouldHaveSize(1)
+            records.first()
+        }
+
+        step("Проверить структуру и содержимое JSON при отсутствии заголовков") {
+            response.path("message").asText() shouldBe "Kafka message does not contain headers"
+
+            val original = response.path("originalMessage")
+            original.path("eventId").asText() shouldBe payload.eventId
+            original.path("userId").asText() shouldBe payload.userId
+            original.path("officeId").asLong() shouldBe payload.officeId
+            original.path("type_action").asInt() shouldBe payload.typeAction
+            original.path("status").asText() shouldBe payload.status
+            original.path("sourceSystem").asText() shouldBe payload.sourceSystem
+            original.path("priority").asInt() shouldBe payload.priority
+            original.path("amount").asText() shouldBe payload.amount.toString()
+        }
+    }
+
 }
