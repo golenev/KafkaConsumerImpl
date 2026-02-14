@@ -68,9 +68,6 @@ class ValidatorServiceE2eTests {
                 it.originalMessage.officeId.toString()
             }
             missingHeadersConsumer.start()
-
-            // небольшая пауза, чтобы консюмеры успели подписаться на топик до начала теста
-            Thread.sleep(500)
         }
 
         @JvmStatic
