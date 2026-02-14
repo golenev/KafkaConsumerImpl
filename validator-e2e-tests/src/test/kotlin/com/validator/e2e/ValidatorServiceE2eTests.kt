@@ -18,6 +18,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.OffsetDateTime
@@ -71,6 +72,7 @@ class ValidatorServiceE2eTests {
     }
 
     @Test
+    @DisplayName("Обогатить и переслать одно сообщение с typeAction 100")
     fun `payload with typeAction 100 is enriched and forwarded`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
@@ -137,6 +139,7 @@ class ValidatorServiceE2eTests {
     }
 
     @Test
+    @DisplayName("Сформировать два выходных сообщения для сценария typeAction 300")
     fun `payload with typeAction 300 produces two output messages`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
@@ -208,6 +211,7 @@ class ValidatorServiceE2eTests {
     }
 
     @Test
+    @DisplayName("Пропустить сообщение с неподдерживаемым typeAction 200 без выхода в output")
     fun `payload with unsupported typeAction is skipped`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
@@ -247,6 +251,7 @@ class ValidatorServiceE2eTests {
     }
 
     @Test
+    @DisplayName("Обработать только один экземпляр при дублировании сообщения с одинаковым idempotency key")
     fun `duplicate payload with same idempotency key is processed only once`() {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
