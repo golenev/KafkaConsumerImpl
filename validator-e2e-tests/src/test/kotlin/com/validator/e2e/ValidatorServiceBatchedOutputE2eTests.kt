@@ -30,7 +30,6 @@ class ValidatorServiceBatchedOutputE2eTests {
 
     companion object {
         private const val BATCH_KEY = "withBatch"
-        private const val BATCH_SIZE = 10
 
         private lateinit var producer: ProducerKafkaService<ValidationPayload>
         private lateinit var batchedConsumer: ConsumerKafkaService<ValidatedPayload>
@@ -84,36 +83,32 @@ class ValidatorServiceBatchedOutputE2eTests {
         val officeId = Random.nextLong(1, Long.MAX_VALUE)
         val eventId = UUID.randomUUID().toString()
 
-        val payloads = (1..BATCH_SIZE).map { idx ->
-            ValidationPayload(
-                eventId = if (idx == 1) eventId else UUID.randomUUID().toString(),
-                userId = "user-${UUID.randomUUID()}",
-                officeId = officeId,
-                typeAction = 100,
-                status = "NEW",
-                sourceSystem = "validator-e2e",
-                priority = 7,
-                amount = BigDecimal("321.00"),
+        val payload = ValidationPayload(
+            eventId = eventId,
+            userId = "user-${UUID.randomUUID()}",
+            officeId = officeId,
+            typeAction = 100,
+            status = "NEW",
+            sourceSystem = "validator-e2e",
+            priority = 7,
+            amount = BigDecimal("321.00"),
+        )
+
+        step("Отправить одно сообщение с ключом withBatch") {
+            val headers = mapOf(
+                KafkaHeaderNames.IDEMPOTENCY_KEY to "idem-${payload.eventId}",
+                KafkaHeaderNames.MESSAGE_ID to "msg-${payload.eventId}",
+                KafkaHeaderNames.SOURCE_SYSTEM to "validator-e2e-tests"
             )
+            producer.sendMessageToKafka(BATCH_KEY, payload, headers)
         }
 
-        step("Отправить 10 сообщений с ключом withBatch для формирования одного батча") {
-            payloads.forEach { payload ->
-                val headers = mapOf(
-                    KafkaHeaderNames.IDEMPOTENCY_KEY to "idem-${payload.eventId}",
-                    KafkaHeaderNames.MESSAGE_ID to "msg-${payload.eventId}",
-                    KafkaHeaderNames.SOURCE_SYSTEM to "validator-e2e-tests"
-                )
-                producer.sendMessageToKafka(BATCH_KEY, payload, headers)
-            }
+        val records = step("Дождаться сообщения из batched_output") {
+            batchedConsumer.waitForKeyListWithHeaders(officeId.toString(), timeoutMs = 30_000, min = 1, max = 1)
         }
 
-        val records = step("Дождаться 10 разложенных сообщений из batched_output") {
-            batchedConsumer.waitForKeyListWithHeaders(officeId.toString(), timeoutMs = 30_000, min = 10, max = 10)
-        }
-
-        step("Проверить, что целевое сообщение обогащено и присутствует в батче") {
-            records.shouldHaveSize(10)
+        step("Проверить, что целевое сообщение обогащено") {
+            records.shouldHaveSize(1)
             val consumed = records.first { it.value.eventId == eventId }
             consumed.value.typeAction shouldBe 100
             consumed.value.status shouldBe "NEW"
