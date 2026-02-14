@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.RequestHeader
 
 @RestController
 @RequestMapping("/api/v1/validation")
@@ -16,8 +17,11 @@ class ValidationController(
 ) {
 
     @PostMapping
-    fun publish(@Valid @RequestBody payload: ValidationPayload): ResponseEntity<Void> {
-        inboundEventProducer.publish(payload)
+    fun publish(
+        @Valid @RequestBody payload: ValidationPayload,
+        @RequestHeader(name = "X-Idempotency-Key", required = false) idempotencyKey: String?
+    ): ResponseEntity<Void> {
+        inboundEventProducer.publish(payload, idempotencyKey)
         return ResponseEntity.accepted().build()
     }
 }
