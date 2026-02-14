@@ -10,19 +10,21 @@
 
 - Kotlin 2.1 с Gradle Kotlin DSL
 - Spring Boot 3.3 (Web, Validation, Spring for Apache Kafka)
-- Apache Kafka Client 3.7 и Kafdrop для наблюдения за брокером
+- Apache Kafka Client 3.7 и Redpanda Console для наблюдения за брокером
 - Jackson для (де)сериализации JSON
 - JUnit 5 и Kotest для автоматизированных тестов
 
 ## Запуск проекта
 
 1. Запустите Spring-приложение, вызвав `fun main(args: Array<String>) { runApplication<ValidatorApplication>(*args) }` из `validator-service/src/main/kotlin/com/validator/app/ValidatorApplication.kt`. Это можно сделать из IDE или командой `./gradlew :validator-service:bootRun`.
-2. Поднимите инфраструктуру Kafka и Kafdrop: `docker compose up -d`. Файл `docker-compose.yml` расположен в корне репозитория.
-3. Откройте веб-интерфейс Kafdrop по адресу http://localhost:9000, чтобы убедиться, что брокер доступен и топики созданы.
+2. Поднимите инфраструктуру Kafka и Redpanda Console: `docker compose up -d`. Файл `docker-compose.yml` расположен в корне репозитория.
+3. Откройте веб-интерфейс Redpanda Console по адресу `http://localhost:${REDPANDA_CONSOLE_PORT:-9000}` (по умолчанию `http://localhost:9000`), чтобы убедиться, что брокер доступен и топики созданы.
 
-## Проверка логики через тесты и Kafdrop
+## Проверка логики через тесты и Redpanda Console
 
-Интеграционные тесты модуля `validator-e2e-tests` поднимают сервис, публикуют события и считывают ответы из Kafka. Наблюдая за выполнением тестов и параллельно отслеживая очереди в Kafdrop, можно проследить весь жизненный цикл сообщения: от REST-запроса до появления валидированного события в выходном топике, проверить задержки и убедиться, что сервис корректно коммитит смещения.
+> Если `docker compose up -d` падает с ошибкой `container name ... is already in use`, это конфликт имени контейнера между проектами. В текущем `docker-compose.yml` имя контейнера для Redpanda Console не фиксируется, поэтому конфликтов по имени быть не должно. Если занят именно порт на хосте, запустите с другим портом: `REDPANDA_CONSOLE_PORT=9001 docker compose up -d`.
+
+Интеграционные тесты модуля `validator-e2e-tests` поднимают сервис, публикуют события и считывают ответы из Kafka. Наблюдая за выполнением тестов и параллельно отслеживая очереди в Redpanda Console, можно проследить весь жизненный цикл сообщения: от REST-запроса до появления валидированного события в выходном топике, проверить задержки и убедиться, что сервис корректно коммитит смещения.
 
 ## Как работают Kafka-утилиты в `validator-e2e-tests`
 

@@ -17,12 +17,12 @@ services:
       KAFKA_RESTART_DELAY: "5"
       ZOOKEEPER_AUTOPURGE_PURGE_INTERVAL: "0"
 
-  kafdrop:
-    image: obsidiandynamics/kafdrop
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:latest
     restart: "no"
     ports:
-      - "9000:9000"
+      - "${REDPANDA_CONSOLE_PORT:-9000}:8080"
     environment:
-      KAFKA_BROKERCONNECT: "kafka:29092"
+      KAFKA_BROKERS: "kafka:29092"
     depends_on:
       - kafka
