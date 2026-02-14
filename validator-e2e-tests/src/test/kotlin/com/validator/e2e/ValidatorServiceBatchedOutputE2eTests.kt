@@ -217,7 +217,7 @@ class ValidatorServiceBatchedOutputE2eTests {
             amount = BigDecimal("555.55"),
         )
 
-        step("Отправить дубликаты и 9 дополнительных уникальных сообщений для добора батча до 10") {
+        step("Отправить два дубликата сообщения") {
             val duplicateHeaders = mapOf(
                 KafkaHeaderNames.IDEMPOTENCY_KEY to duplicateIdempotency,
                 KafkaHeaderNames.MESSAGE_ID to "msg-$eventId",
@@ -225,7 +225,9 @@ class ValidatorServiceBatchedOutputE2eTests {
             )
             producer.sendMessageToKafka(BATCH_KEY, duplicatePayload, duplicateHeaders)
             producer.sendMessageToKafka(BATCH_KEY, duplicatePayload, duplicateHeaders)
+        }
 
+        step("Отправить 9 дополнительных уникальных сообщений для добора батча до 10") {
             repeat(9) {
                 val payload = ValidationPayload(
                     eventId = UUID.randomUUID().toString(),
