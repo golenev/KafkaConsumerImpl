@@ -30,7 +30,7 @@ class ProducerKafkaService<T : Any>(
         }
     }
 
-    fun send(
+    fun sendMessageToKafka(
         key: String?,
         payload: T,
         headers: Map<String, String> = emptyMap(),

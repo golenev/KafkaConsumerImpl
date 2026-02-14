@@ -99,7 +99,7 @@ class ValidatorServiceE2eTests {
         }
 
         step("Отправить входное сообщение в input-топик валидатора") {
-            producer.send(eventId, payload, headers)
+            producer.sendMessageToKafka(eventId, payload, headers)
         }
 
         val records = step("Дождаться единственного сообщения в output-топике после обогащения") {
@@ -166,7 +166,7 @@ class ValidatorServiceE2eTests {
         }
 
         step("Отправить сообщение, которое должно породить две выходные записи") {
-            producer.send(eventId, payload, headers)
+            producer.sendMessageToKafka(eventId, payload, headers)
         }
 
         val records = step("Дождаться двух выходных сообщений в output-топике") {
@@ -238,7 +238,7 @@ class ValidatorServiceE2eTests {
         }
 
         step("Отправить сообщение с неподдерживаемым typeAction в input-топик") {
-            producer.send(eventId, payload, headers)
+            producer.sendMessageToKafka(eventId, payload, headers)
         }
 
         val records = step("Дождаться отсутствия сообщений в output-топике для данного officeId") {
@@ -278,11 +278,11 @@ class ValidatorServiceE2eTests {
         }
 
         step("Отправить первый экземпляр сообщения с заданным idempotency key") {
-            producer.send(eventId, payload, headers)
+            producer.sendMessageToKafka(eventId, payload, headers)
         }
 
         step("Отправить дублирующий экземпляр сообщения с тем же idempotency key") {
-            producer.send(eventId, payload, headers)
+            producer.sendMessageToKafka(eventId, payload, headers)
         }
 
         val records = step("Дождаться результатов обработки дублирующих сообщений") {
