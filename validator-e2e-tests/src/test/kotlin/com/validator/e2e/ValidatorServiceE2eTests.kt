@@ -12,6 +12,7 @@ import configs.validatorInputProducerConfig
 import configs.validatorOutputConsumerConfig
 import configs.ObjectMapper
 import io.kotest.assertions.throwables.shouldNotThrowAny
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -195,4 +196,94 @@ class ValidatorServiceE2eTests {
             records.map { it.value.priority }.toSet() shouldBe expectedPriorities
         }
     }
+
+    @Test
+    @DisplayName("Проверка, что при входном сообщении с неподдерживаемым typeAction 200 система не публикует результат в выходной топик")
+    fun `payload with unsupported typeAction is skipped`() {
+        val officeId = Random.nextLong(1, Long.MAX_VALUE)
+        val eventId = UUID.randomUUID().toString()
+
+        val payload = step("Сформировать входное сообщение с неподдерживаемым typeAction 200") {
+            ValidationPayload(
+                eventId = eventId,
+                userId = "user-${UUID.randomUUID()}",
+                officeId = officeId,
+                typeAction = 200,
+                status = "NEW",
+                sourceSystem = "validator-e2e",
+                priority = 5,
+                amount = BigDecimal("123.45"),
+            )
+        }
+
+        val headers = step("Сформировать заголовки для сообщения, которое должно быть отфильтровано") {
+            mapOf(
+                KafkaHeaderNames.IDEMPOTENCY_KEY to "idem-$eventId",
+                KafkaHeaderNames.MESSAGE_ID to "msg-$eventId",
+                KafkaHeaderNames.SOURCE_SYSTEM to "validator-e2e-tests"
+            )
+        }
+
+        step("Отправить сообщение с неподдерживаемым typeAction в input-топик") {
+            producer.sendMessageToKafka(eventId, payload, headers)
+        }
+
+        val records = step("Дождаться отсутствия сообщений в output-топике для данного officeId") {
+            consumer.waitForKeyListAbsent(officeId.toString(), timeoutMs = 30_000)
+        }
+
+        step("Проверить что сообщение с неподдерживаемым typeAction не прошло обработку") {
+            records.shouldBeEmpty()
+        }
+    }
+
+    @Test
+    @DisplayName("Проверка, что при повторной отправке сообщения с одинаковым idempotency key система обрабатывает только первый экземпляр")
+    fun `duplicate payload with same idempotency key is processed only once`() {
+        val officeId = Random.nextLong(1, Long.MAX_VALUE)
+        val eventId = UUID.randomUUID().toString()
+
+        val payload = step("Сформировать входное сообщение для проверки идемпотентности") {
+            ValidationPayload(
+                eventId = eventId,
+                userId = "user-${UUID.randomUUID()}",
+                officeId = officeId,
+                typeAction = 100,
+                status = "NEW",
+                sourceSystem = "validator-e2e",
+                priority = 10,
+                amount = BigDecimal("555.55"),
+            )
+        }
+
+        val headers = step("Сформировать заголовки с общим idempotency key для дубликатов") {
+            mapOf(
+                KafkaHeaderNames.IDEMPOTENCY_KEY to "idem-dedup-$eventId",
+                KafkaHeaderNames.MESSAGE_ID to "msg-$eventId",
+                KafkaHeaderNames.SOURCE_SYSTEM to "validator-e2e-tests"
+            )
+        }
+
+        step("Отправить первый экземпляр сообщения с заданным idempotency key") {
+            producer.sendMessageToKafka(eventId, payload, headers)
+        }
+
+        step("Отправить дублирующий экземпляр сообщения с тем же idempotency key") {
+            producer.sendMessageToKafka(eventId, payload, headers)
+        }
+
+        val records = step("Дождаться результатов обработки дублирующих сообщений") {
+            consumer.waitForKeyListWithHeaders(officeId.toString(), timeoutMs = 35_000, min = 1, max = 2)
+        }
+
+        step("Проверить что из двух отправок обработано только одно сообщение") {
+            records.shouldHaveSize(1)
+            records.first().value.eventId shouldBe eventId
+        }
+
+        step("Проверить что у обработанного сообщения сохранён исходный idempotency key") {
+            records.first().headers[KafkaHeaderNames.IDEMPOTENCY_KEY] shouldBe headers[KafkaHeaderNames.IDEMPOTENCY_KEY]
+        }
+    }
+
 }
