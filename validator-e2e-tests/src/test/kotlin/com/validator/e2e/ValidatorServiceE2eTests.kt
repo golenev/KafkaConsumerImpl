@@ -42,7 +42,7 @@ class ValidatorServiceE2eTests {
                 mapper = mapper,
             )
 
-            val consumerKafkaConfig = validatorOutputConsumerConfig(ValidatedPayload::class.java)
+            val consumerKafkaConfig = validatorOutputConsumerConfig(deserializerClass = ValidatedPayload::class.java)
 
             consumer = runService(
                 cfg = consumerKafkaConfig,

@@ -44,7 +44,7 @@ class ValidatorServiceBatchedOutputE2eTests {
                 mapper = mapper,
             )
 
-            val consumerKafkaConfig = validatorBatchedOutputConsumerConfig(ValidatedPayload::class.java)
+            val consumerKafkaConfig = validatorBatchedOutputConsumerConfig(deserializerClass = ValidatedPayload::class.java)
 
             batchedConsumer = runService(
                 cfg = consumerKafkaConfig,

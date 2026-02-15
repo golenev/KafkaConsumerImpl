@@ -21,7 +21,7 @@ class ConsumerKafkaConfig(
     var partitionAssignmentStrategy: String =
         """org.apache.kafka.clients.consumer.RangeAssignor,org.apache.kafka.clients.consumer.CooperativeStickyAssignor"""
     lateinit var awaitTopic: String
-    lateinit var awaitClazz: Class<*>
+    lateinit var deserializerClass: Class<*>
     var awaitLastNPerPartition: Int = 50
     lateinit var awaitMapper: ObjectMapper
 

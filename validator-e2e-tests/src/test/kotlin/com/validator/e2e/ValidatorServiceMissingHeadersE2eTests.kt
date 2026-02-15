@@ -36,7 +36,7 @@ class ValidatorServiceMissingHeadersE2eTests {
                 mapper = mapper,
             )
 
-            val consumerKafkaConfig = validatorOutputConsumerConfig(MissingHeadersPayload::class.java)
+            val consumerKafkaConfig = validatorOutputConsumerConfig(deserializerClass = MissingHeadersPayload::class.java)
 
             missingHeadersConsumer = runService(
                 cfg = consumerKafkaConfig,

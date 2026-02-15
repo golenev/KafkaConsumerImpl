@@ -19,7 +19,7 @@ val someConsumerConfig: ConsumerKafkaConfig =
         autoCommit = false
         awaitTopic = "some_topic"
         awaitMapper = ObjectMapper()
-        awaitClazz = Any::class.java
+        deserializerClass = Any::class.java
     }
 
 

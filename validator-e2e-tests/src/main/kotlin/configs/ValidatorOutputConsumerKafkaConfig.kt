@@ -4,7 +4,7 @@ import com.validator.e2e.kafka.consumer.ConsumerKafkaConfig
 
 private const val OUTPUT_TOPIC = "out_validator"
 
-fun validatorOutputConsumerConfig(awaitClazz: Class<*>): ConsumerKafkaConfig =
+fun validatorOutputConsumerConfig(deserializerClass: Class<*>): ConsumerKafkaConfig =
     ConsumerKafkaConfig(
         bootstrapServers = "localhost:9092",
         username = "validator-user",
@@ -16,6 +16,6 @@ fun validatorOutputConsumerConfig(awaitClazz: Class<*>): ConsumerKafkaConfig =
         autoCommit = false
         awaitTopic = OUTPUT_TOPIC
         awaitMapper = ObjectMapper.globalMapper
-        this.awaitClazz = awaitClazz
+        this.deserializerClass = deserializerClass
         awaitLastNPerPartition = 0
     }
