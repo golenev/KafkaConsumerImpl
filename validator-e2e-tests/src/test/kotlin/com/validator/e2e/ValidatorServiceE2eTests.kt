@@ -8,8 +8,10 @@ import com.validator.e2e.tests.step
 import com.validator.e2e.kafka.consumer.ConsumerKafkaService
 import com.validator.e2e.kafka.consumer.runService
 import com.validator.e2e.kafka.producer.ProducerKafkaService
-import configs.ValidatorConsumerKafkaSettings
-import configs.ValidatorProducerKafkaSettings
+import configs.VALIDATOR_INPUT_TOPIC
+import configs.validatorInputProducerConfig
+import configs.validatorOutputConsumerConfig
+import configs.validatorOutputMissingHeadersConsumerConfig
 import configs.ObjectMapper
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -32,39 +34,21 @@ class ValidatorServiceE2eTests {
         private lateinit var producer: ProducerKafkaService<ValidationPayload>
         private lateinit var consumer: ConsumerKafkaService<ValidatedPayload>
         private lateinit var missingHeadersConsumer: ConsumerKafkaService<MissingHeadersPayload>
-        private val producerSettings = ValidatorProducerKafkaSettings()
-        private val consumerSettings = ValidatorConsumerKafkaSettings()
         private val mapper = ObjectMapper.globalMapper
 
         @JvmStatic
         @BeforeAll
         fun setUp() {
-            val producerConfig = producerSettings.createProducerConfig()
-
             producer = ProducerKafkaService(
-                cfg = producerConfig,
-                topic = producerSettings.inputTopic,
+                cfg = validatorInputProducerConfig,
+                topic = VALIDATOR_INPUT_TOPIC,
                 mapper = mapper,
             )
 
-            val consumerConfig = consumerSettings.createConsumerConfig().apply {
-                awaitTopic = consumerSettings.outputTopic
-                awaitMapper = mapper
-                awaitClazz = ValidatedPayload::class.java
-                awaitLastNPerPartition = 0
-            }
-
-            consumer = runService(consumerConfig) { it.officeId.toString() }
+            consumer = runService(validatorOutputConsumerConfig) { it.officeId.toString() }
             consumer.start()
 
-            val missingHeadersConsumerConfig = consumerSettings.createConsumerConfig().apply {
-                awaitTopic = consumerSettings.outputTopic
-                awaitMapper = mapper
-                awaitClazz = MissingHeadersPayload::class.java
-                awaitLastNPerPartition = 0
-            }
-
-            missingHeadersConsumer = runService(missingHeadersConsumerConfig) {
+            missingHeadersConsumer = runService(validatorOutputMissingHeadersConsumerConfig) {
                 it.originalMessage.officeId.toString()
             }
             missingHeadersConsumer.start()

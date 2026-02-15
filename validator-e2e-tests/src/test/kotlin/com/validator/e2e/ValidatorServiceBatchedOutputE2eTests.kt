@@ -8,8 +8,10 @@ import com.validator.e2e.tests.step
 import com.validator.e2e.kafka.consumer.ConsumerKafkaService
 import com.validator.e2e.kafka.consumer.runService
 import com.validator.e2e.kafka.producer.ProducerKafkaService
-import configs.ValidatorConsumerKafkaSettings
-import configs.ValidatorProducerKafkaSettings
+import configs.VALIDATOR_INPUT_TOPIC
+import configs.validatorBatchedMissingHeadersConsumerConfig
+import configs.validatorBatchedOutputConsumerConfig
+import configs.validatorInputProducerConfig
 import configs.ObjectMapper
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -34,37 +36,21 @@ class ValidatorServiceBatchedOutputE2eTests {
         private lateinit var producer: ProducerKafkaService<ValidationPayload>
         private lateinit var batchedConsumer: ConsumerKafkaService<ValidatedPayload>
         private lateinit var missingHeadersConsumer: ConsumerKafkaService<MissingHeadersPayload>
-        private val producerSettings = ValidatorProducerKafkaSettings()
-        private val consumerSettings = ValidatorConsumerKafkaSettings()
         private val mapper = ObjectMapper.globalMapper
 
         @JvmStatic
         @BeforeAll
         fun setUp() {
             producer = ProducerKafkaService(
-                cfg = producerSettings.createProducerConfig(),
-                topic = producerSettings.inputTopic,
+                cfg = validatorInputProducerConfig,
+                topic = VALIDATOR_INPUT_TOPIC,
                 mapper = mapper,
             )
 
-            val batchedConsumerConfig = consumerSettings.createConsumerConfig().apply {
-                awaitTopic = consumerSettings.batchedOutputTopic
-                awaitMapper = mapper
-                awaitClazz = ValidatedPayload::class.java
-                // В batched-сценариях сервис публикует сообщения быстрее (без искусственных задержек),
-                // поэтому читаем последние N сообщений, чтобы избежать race при старте консюмера.
-                awaitLastNPerPartition = 200
-            }
-            batchedConsumer = runService(batchedConsumerConfig) { it.officeId.toString() }
+            batchedConsumer = runService(validatorBatchedOutputConsumerConfig) { it.officeId.toString() }
             batchedConsumer.start()
 
-            val missingHeadersConsumerConfig = consumerSettings.createConsumerConfig().apply {
-                awaitTopic = consumerSettings.outputTopic
-                awaitMapper = mapper
-                awaitClazz = MissingHeadersPayload::class.java
-                awaitLastNPerPartition = 200
-            }
-            missingHeadersConsumer = runService(missingHeadersConsumerConfig) { it.originalMessage.officeId.toString() }
+            missingHeadersConsumer = runService(validatorBatchedMissingHeadersConsumerConfig) { it.originalMessage.officeId.toString() }
             missingHeadersConsumer.start()
         }
 
