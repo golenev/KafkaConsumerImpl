@@ -1,7 +1,7 @@
-package configs
+package configs // Помещает файл в пакет configs.
 
 import com.validator.e2e.kafka.producer.ProducerKafkaConfig
-import java.util.UUID
+import java.util.*
 
 const val VALIDATOR_INPUT_TOPIC = "in_validator"
 
@@ -12,5 +12,5 @@ fun validatorInputProducerConfig(): ProducerKafkaConfig =
         password = "validator-password",
     ).apply {
         securityProtocol = "PLAINTEXT"
-        clientId = "validator-e2e-tests-${UUID.randomUUID()}"
+        clientId = "validator-e2e-tests-${UUID.randomUUID()}" // Формирует уникальный clientId для изоляции producer-сессий в тестах.
     }
