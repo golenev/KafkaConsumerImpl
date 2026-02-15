@@ -2,6 +2,7 @@ package com.validator.e2e
 
 import com.validator.app.model.MissingHeadersPayload
 import com.validator.app.model.ValidationPayload
+import com.validator.e2e.kafka.consumer.ConsumerKafkaService
 import com.validator.e2e.kafka.consumer.runService
 import com.validator.e2e.kafka.producer.ProducerKafkaService
 import com.validator.e2e.tests.step
@@ -23,6 +24,7 @@ class ValidatorServiceMissingHeadersE2eTests {
 
     companion object {
         private lateinit var producer: ProducerKafkaService<ValidationPayload>
+        private lateinit var missingHeadersConsumer: ConsumerKafkaService<MissingHeadersPayload>
         private val mapper = ObjectMapper.globalMapper
 
         @JvmStatic
@@ -34,6 +36,10 @@ class ValidatorServiceMissingHeadersE2eTests {
                 mapper = mapper,
             )
 
+            missingHeadersConsumer = runService(validatorOutputConsumerConfig(MissingHeadersPayload::class.java)) {
+                it.originalMessage.officeId.toString()
+            }
+            missingHeadersConsumer.start()
         }
 
         @JvmStatic
@@ -41,6 +47,9 @@ class ValidatorServiceMissingHeadersE2eTests {
         fun tearDown() {
             if (::producer.isInitialized) {
                 producer.close()
+            }
+            if (::missingHeadersConsumer.isInitialized) {
+                missingHeadersConsumer.close()
             }
         }
     }
@@ -64,40 +73,31 @@ class ValidatorServiceMissingHeadersE2eTests {
             )
         }
 
-        val missingHeadersConsumer = runService(validatorOutputConsumerConfig(MissingHeadersPayload::class.java)) {
-            it.originalMessage.officeId.toString()
+        step("Отправить сообщение в input-топик без заголовков") {
+            producer.sendMessageToKafka(eventId, payload, emptyMap())
         }
-        missingHeadersConsumer.start()
 
-        try {
-            step("Отправить сообщение в input-топик без заголовков") {
-                producer.sendMessageToKafka(eventId, payload, emptyMap())
-            }
+        val records = step("Дождаться сообщения об отсутствии заголовков в output-топике") {
+            missingHeadersConsumer.waitForKeyList(officeId.toString(), timeoutMs = 30_000, min = 1, max = 1)
+        }
 
-            val records = step("Дождаться сообщения об отсутствии заголовков в output-топике") {
-                missingHeadersConsumer.waitForKeyList(officeId.toString(), timeoutMs = 30_000, min = 1, max = 1)
-            }
+        val response = step("Выбрать единственное сообщение-ошибку") {
+            records.shouldHaveSize(1)
+            records.first()
+        }
 
-            val response = step("Выбрать единственное сообщение-ошибку") {
-                records.shouldHaveSize(1)
-                records.first()
-            }
+        step("Проверить структуру и содержимое JSON при отсутствии заголовков") {
+            response.message shouldBe "Kafka message does not contain headers"
 
-            step("Проверить структуру и содержимое JSON при отсутствии заголовков") {
-                response.message shouldBe "Kafka message does not contain headers"
-
-                val original = response.originalMessage
-                original.eventId shouldBe payload.eventId
-                original.userId shouldBe payload.userId
-                original.officeId shouldBe payload.officeId
-                original.typeAction shouldBe payload.typeAction
-                original.status shouldBe payload.status
-                original.sourceSystem shouldBe payload.sourceSystem
-                original.priority shouldBe payload.priority
-                original.amount shouldBe payload.amount
-            }
-        } finally {
-            missingHeadersConsumer.close()
+            val original = response.originalMessage
+            original.eventId shouldBe payload.eventId
+            original.userId shouldBe payload.userId
+            original.officeId shouldBe payload.officeId
+            original.typeAction shouldBe payload.typeAction
+            original.status shouldBe payload.status
+            original.sourceSystem shouldBe payload.sourceSystem
+            original.priority shouldBe payload.priority
+            original.amount shouldBe payload.amount
         }
     }
 }
