@@ -1,15 +1,15 @@
 package com.validator.e2e.kafka.producer
 
-import com.validator.e2e.kafka.common.KafkaConfig
+import com.validator.e2e.kafka.common.CommonKafkaConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.StringSerializer
-import java.util.Properties
+import java.util.*
 
 class ProducerKafkaConfig(
     bootstrapServers: String,
     username: String?,
     password: String?,
-) : KafkaConfig(bootstrapServers, username, password) {
+) : CommonKafkaConfig(bootstrapServers, username, password) {
 
     var clientId: String? = null
     var lingerMs: Long = 0

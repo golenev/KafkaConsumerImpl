@@ -3,7 +3,7 @@ package com.validator.e2e.kafka.common
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import java.util.*
 
-open class KafkaConfig(
+open class CommonKafkaConfig(
     protected val bootstrapServers: String,
     protected val username: String?,
     protected val password: String?,

@@ -1,7 +1,7 @@
 package com.validator.e2e.kafka.consumer
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.validator.e2e.kafka.common.KafkaConfig
+import com.validator.e2e.kafka.common.CommonKafkaConfig
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
 import java.util.*
@@ -10,7 +10,7 @@ class ConsumerKafkaConfig(
     bootstrapServers: String,
     username: String?,
     password: String?
-) : KafkaConfig(bootstrapServers, username, password) {
+) : CommonKafkaConfig(bootstrapServers, username, password) {
 
     // делаем публичными — чтобы можно было задавать снаружи
     var groupIdPrefix: String? = null
