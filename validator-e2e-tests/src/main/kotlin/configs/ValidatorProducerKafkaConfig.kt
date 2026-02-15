@@ -5,7 +5,7 @@ import java.util.UUID
 
 const val VALIDATOR_INPUT_TOPIC = "in_validator"
 
-val validatorInputProducerConfig: ProducerKafkaConfig =
+fun validatorInputProducerConfig(): ProducerKafkaConfig =
     ProducerKafkaConfig(
         bootstrapServers = "localhost:9092",
         username = "validator-user",

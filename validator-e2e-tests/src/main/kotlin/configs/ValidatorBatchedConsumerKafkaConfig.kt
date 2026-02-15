@@ -1,13 +1,11 @@
 package configs
 
-import com.validator.app.model.MissingHeadersPayload
-import com.validator.app.model.ValidatedPayload
 import com.validator.e2e.kafka.consumer.ConsumerKafkaConfig
 
 private const val OUTPUT_TOPIC = "out_validator"
 private const val BATCHED_OUTPUT_TOPIC = "batched_output"
 
-val validatorBatchedOutputConsumerConfig: ConsumerKafkaConfig =
+fun validatorBatchedOutputConsumerConfig(awaitClazz: Class<*>): ConsumerKafkaConfig =
     ConsumerKafkaConfig(
         bootstrapServers = "localhost:9092",
         username = "validator-user",
@@ -19,13 +17,13 @@ val validatorBatchedOutputConsumerConfig: ConsumerKafkaConfig =
         autoCommit = false
         awaitTopic = BATCHED_OUTPUT_TOPIC
         awaitMapper = ObjectMapper.globalMapper
-        awaitClazz = ValidatedPayload::class.java
+        this.awaitClazz = awaitClazz
         // В batched-сценариях сервис публикует сообщения быстрее (без искусственных задержек),
         // поэтому читаем последние N сообщений, чтобы избежать race при старте консюмера.
         awaitLastNPerPartition = 200
     }
 
-val validatorBatchedMissingHeadersConsumerConfig: ConsumerKafkaConfig =
+fun validatorBatchedErrorConsumerConfig(awaitClazz: Class<*>): ConsumerKafkaConfig =
     ConsumerKafkaConfig(
         bootstrapServers = "localhost:9092",
         username = "validator-user",
@@ -37,6 +35,6 @@ val validatorBatchedMissingHeadersConsumerConfig: ConsumerKafkaConfig =
         autoCommit = false
         awaitTopic = OUTPUT_TOPIC
         awaitMapper = ObjectMapper.globalMapper
-        awaitClazz = MissingHeadersPayload::class.java
+        this.awaitClazz = awaitClazz
         awaitLastNPerPartition = 200
     }

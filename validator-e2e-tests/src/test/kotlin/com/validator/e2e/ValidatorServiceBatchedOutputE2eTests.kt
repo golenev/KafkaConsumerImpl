@@ -9,8 +9,8 @@ import com.validator.e2e.kafka.consumer.ConsumerKafkaService
 import com.validator.e2e.kafka.consumer.runService
 import com.validator.e2e.kafka.producer.ProducerKafkaService
 import configs.VALIDATOR_INPUT_TOPIC
-import configs.validatorBatchedMissingHeadersConsumerConfig
 import configs.validatorBatchedOutputConsumerConfig
+import configs.validatorBatchedErrorConsumerConfig
 import configs.validatorInputProducerConfig
 import configs.ObjectMapper
 import io.kotest.assertions.throwables.shouldNotThrowAny
@@ -42,15 +42,15 @@ class ValidatorServiceBatchedOutputE2eTests {
         @BeforeAll
         fun setUp() {
             producer = ProducerKafkaService(
-                cfg = validatorInputProducerConfig,
+                cfg = validatorInputProducerConfig(),
                 topic = VALIDATOR_INPUT_TOPIC,
                 mapper = mapper,
             )
 
-            batchedConsumer = runService(validatorBatchedOutputConsumerConfig) { it.officeId.toString() }
+            batchedConsumer = runService(validatorBatchedOutputConsumerConfig(ValidatedPayload::class.java)) { it.officeId.toString() }
             batchedConsumer.start()
 
-            missingHeadersConsumer = runService(validatorBatchedMissingHeadersConsumerConfig) { it.originalMessage.officeId.toString() }
+            missingHeadersConsumer = runService(validatorBatchedErrorConsumerConfig(MissingHeadersPayload::class.java)) { it.originalMessage.officeId.toString() }
             missingHeadersConsumer.start()
         }
 
