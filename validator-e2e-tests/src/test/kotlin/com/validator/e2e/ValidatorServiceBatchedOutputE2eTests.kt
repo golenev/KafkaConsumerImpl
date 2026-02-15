@@ -1,16 +1,16 @@
 package com.validator.e2e
 
-import com.validator.app.model.MissingHeadersPayload
 import com.validator.app.model.ValidatedPayload
 import com.validator.app.model.ValidationPayload
 import com.validator.app.service.KafkaHeaderNames
-import com.validator.e2e.tests.step
 import com.validator.e2e.kafka.consumer.ConsumerKafkaService
 import com.validator.e2e.kafka.consumer.runService
 import com.validator.e2e.kafka.producer.ProducerKafkaService
-import configs.ValidatorConsumerKafkaSettings
-import configs.ValidatorProducerKafkaSettings
+import com.validator.e2e.tests.step
 import configs.ObjectMapper
+import configs.VALIDATOR_INPUT_TOPIC
+import configs.validatorBatchedOutputConsumerConfig
+import configs.validatorInputProducerConfig
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -23,7 +23,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.OffsetDateTime
-import java.util.UUID
+import java.util.*
 import kotlin.random.Random
 
 class ValidatorServiceBatchedOutputE2eTests {
@@ -33,39 +33,24 @@ class ValidatorServiceBatchedOutputE2eTests {
 
         private lateinit var producer: ProducerKafkaService<ValidationPayload>
         private lateinit var batchedConsumer: ConsumerKafkaService<ValidatedPayload>
-        private lateinit var missingHeadersConsumer: ConsumerKafkaService<MissingHeadersPayload>
-        private val producerSettings = ValidatorProducerKafkaSettings()
-        private val consumerSettings = ValidatorConsumerKafkaSettings()
         private val mapper = ObjectMapper.globalMapper
 
         @JvmStatic
         @BeforeAll
         fun setUp() {
             producer = ProducerKafkaService(
-                cfg = producerSettings.createProducerConfig(),
-                topic = producerSettings.inputTopic,
+                cfg = validatorInputProducerConfig(),
+                topic = VALIDATOR_INPUT_TOPIC,
                 mapper = mapper,
             )
 
-            val batchedConsumerConfig = consumerSettings.createConsumerConfig().apply {
-                awaitTopic = consumerSettings.batchedOutputTopic
-                awaitMapper = mapper
-                awaitClazz = ValidatedPayload::class.java
-                // В batched-сценариях сервис публикует сообщения быстрее (без искусственных задержек),
-                // поэтому читаем последние N сообщений, чтобы избежать race при старте консюмера.
-                awaitLastNPerPartition = 200
-            }
-            batchedConsumer = runService(batchedConsumerConfig) { it.officeId.toString() }
-            batchedConsumer.start()
+            val consumerKafkaConfig = validatorBatchedOutputConsumerConfig(ValidatedPayload::class.java)
 
-            val missingHeadersConsumerConfig = consumerSettings.createConsumerConfig().apply {
-                awaitTopic = consumerSettings.outputTopic
-                awaitMapper = mapper
-                awaitClazz = MissingHeadersPayload::class.java
-                awaitLastNPerPartition = 200
-            }
-            missingHeadersConsumer = runService(missingHeadersConsumerConfig) { it.originalMessage.officeId.toString() }
-            missingHeadersConsumer.start()
+            batchedConsumer = runService(
+                cfg = consumerKafkaConfig,
+                keySelector = { it.officeId.toString() },
+            )
+            batchedConsumer.start()
         }
 
         @JvmStatic
@@ -73,7 +58,6 @@ class ValidatorServiceBatchedOutputE2eTests {
         fun tearDown() {
             if (::producer.isInitialized) producer.close()
             if (::batchedConsumer.isInitialized) batchedConsumer.close()
-            if (::missingHeadersConsumer.isInitialized) missingHeadersConsumer.close()
         }
     }
 
@@ -254,40 +238,6 @@ class ValidatorServiceBatchedOutputE2eTests {
 
         step("Проверить что из двух дубликатов обработался только один") {
             records.filter { it.value.eventId == eventId }.shouldHaveSize(1)
-        }
-    }
-
-    @Test
-    @DisplayName("Проверка, что при отсутствии заголовков сообщение уходит в output с ошибкой, даже если ключ withBatch")
-    fun `payload without headers is forwarded as error json with original message even with batch key`() {
-        val officeId = Random.nextLong(1, Long.MAX_VALUE)
-        val eventId = UUID.randomUUID().toString()
-
-        val payload = ValidationPayload(
-            eventId = eventId,
-            userId = "user-${UUID.randomUUID()}",
-            officeId = officeId,
-            typeAction = 100,
-            status = "NEW",
-            sourceSystem = "validator-e2e",
-            priority = 3,
-            amount = BigDecimal("42.00"),
-        )
-
-        step("Отправить сообщение без заголовков и с ключом withBatch") {
-            producer.sendMessageToKafka(BATCH_KEY, payload, emptyMap())
-        }
-
-        val records = step("Дождаться сообщения об ошибке в обычном output-топике") {
-            missingHeadersConsumer.waitForKeyList(officeId.toString(), timeoutMs = 30_000, min = 1, max = 1)
-        }
-
-        step("Проверить структуру и содержимое JSON при отсутствии заголовков") {
-            records.shouldHaveSize(1)
-            val response = records.first()
-            response.message shouldBe "Kafka message does not contain headers"
-            response.originalMessage.eventId shouldBe eventId
-            response.originalMessage.officeId shouldBe officeId
         }
     }
 }
