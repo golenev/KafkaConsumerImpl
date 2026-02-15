@@ -1,18 +1,16 @@
 package com.validator.e2e
 
-import com.validator.app.model.MissingHeadersPayload
 import com.validator.app.model.ValidatedPayload
 import com.validator.app.model.ValidationPayload
 import com.validator.app.service.KafkaHeaderNames
-import com.validator.e2e.tests.step
 import com.validator.e2e.kafka.consumer.ConsumerKafkaService
 import com.validator.e2e.kafka.consumer.runService
 import com.validator.e2e.kafka.producer.ProducerKafkaService
+import com.validator.e2e.tests.step
+import configs.ObjectMapper
 import configs.VALIDATOR_INPUT_TOPIC
 import configs.validatorBatchedOutputConsumerConfig
-import configs.validatorBatchedErrorConsumerConfig
 import configs.validatorInputProducerConfig
-import configs.ObjectMapper
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -25,7 +23,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.OffsetDateTime
-import java.util.UUID
+import java.util.*
 import kotlin.random.Random
 
 class ValidatorServiceBatchedOutputE2eTests {
@@ -35,7 +33,6 @@ class ValidatorServiceBatchedOutputE2eTests {
 
         private lateinit var producer: ProducerKafkaService<ValidationPayload>
         private lateinit var batchedConsumer: ConsumerKafkaService<ValidatedPayload>
-        private lateinit var missingHeadersConsumer: ConsumerKafkaService<MissingHeadersPayload>
         private val mapper = ObjectMapper.globalMapper
 
         @JvmStatic
@@ -47,17 +44,13 @@ class ValidatorServiceBatchedOutputE2eTests {
                 mapper = mapper,
             )
 
+            val consumerKafkaConfig = validatorBatchedOutputConsumerConfig(ValidatedPayload::class.java)
+
             batchedConsumer = runService(
-                cfg = validatorBatchedOutputConsumerConfig(ValidatedPayload::class.java),
+                cfg = consumerKafkaConfig,
                 keySelector = { it.officeId.toString() },
             )
             batchedConsumer.start()
-
-            missingHeadersConsumer = runService(
-                cfg = validatorBatchedErrorConsumerConfig(MissingHeadersPayload::class.java),
-                keySelector = { it.originalMessage.officeId.toString() },
-            )
-            missingHeadersConsumer.start()
         }
 
         @JvmStatic
@@ -65,7 +58,6 @@ class ValidatorServiceBatchedOutputE2eTests {
         fun tearDown() {
             if (::producer.isInitialized) producer.close()
             if (::batchedConsumer.isInitialized) batchedConsumer.close()
-            if (::missingHeadersConsumer.isInitialized) missingHeadersConsumer.close()
         }
     }
 

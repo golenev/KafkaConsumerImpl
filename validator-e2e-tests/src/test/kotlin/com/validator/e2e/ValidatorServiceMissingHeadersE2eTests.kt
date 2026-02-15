@@ -17,7 +17,7 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
-import java.util.UUID
+import java.util.*
 import kotlin.random.Random
 
 class ValidatorServiceMissingHeadersE2eTests {
@@ -36,8 +36,10 @@ class ValidatorServiceMissingHeadersE2eTests {
                 mapper = mapper,
             )
 
+            val consumerKafkaConfig = validatorOutputConsumerConfig(MissingHeadersPayload::class.java)
+
             missingHeadersConsumer = runService(
-                cfg = validatorOutputConsumerConfig(MissingHeadersPayload::class.java),
+                cfg = consumerKafkaConfig,
                 keySelector = { it.originalMessage.officeId.toString() },
             )
             missingHeadersConsumer.start()

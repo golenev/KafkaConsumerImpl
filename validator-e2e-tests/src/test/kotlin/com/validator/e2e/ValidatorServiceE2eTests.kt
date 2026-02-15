@@ -1,16 +1,16 @@
 package com.validator.e2e
 
-import com.validator.app.model.ValidationPayload
 import com.validator.app.model.ValidatedPayload
+import com.validator.app.model.ValidationPayload
 import com.validator.app.service.KafkaHeaderNames
-import com.validator.e2e.tests.step
 import com.validator.e2e.kafka.consumer.ConsumerKafkaService
 import com.validator.e2e.kafka.consumer.runService
 import com.validator.e2e.kafka.producer.ProducerKafkaService
+import com.validator.e2e.tests.step
+import configs.ObjectMapper
 import configs.VALIDATOR_INPUT_TOPIC
 import configs.validatorInputProducerConfig
 import configs.validatorOutputConsumerConfig
-import configs.ObjectMapper
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -23,7 +23,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.OffsetDateTime
-import java.util.UUID
+import java.util.*
 import kotlin.random.Random
 
 class ValidatorServiceE2eTests {
@@ -42,8 +42,10 @@ class ValidatorServiceE2eTests {
                 mapper = mapper,
             )
 
+            val consumerKafkaConfig = validatorOutputConsumerConfig(ValidatedPayload::class.java)
+
             consumer = runService(
-                cfg = validatorOutputConsumerConfig(ValidatedPayload::class.java),
+                cfg = consumerKafkaConfig,
                 keySelector = { it.officeId.toString() },
             )
             consumer.start()
