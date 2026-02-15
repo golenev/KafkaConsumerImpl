@@ -10,7 +10,7 @@ import com.validator.e2e.kafka.consumer.runService
 import com.validator.e2e.kafka.producer.ProducerKafkaService
 import configs.ValidatorConsumerKafkaSettings
 import configs.ValidatorProducerKafkaSettings
-import configs.ValidatorTestObjectMapper
+import configs.ObjectMapper
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -36,7 +36,7 @@ class ValidatorServiceBatchedOutputE2eTests {
         private lateinit var missingHeadersConsumer: ConsumerKafkaService<MissingHeadersPayload>
         private val producerSettings = ValidatorProducerKafkaSettings()
         private val consumerSettings = ValidatorConsumerKafkaSettings()
-        private val mapper = ValidatorTestObjectMapper.globalMapper
+        private val mapper = ObjectMapper.globalMapper
 
         @JvmStatic
         @BeforeAll
