@@ -36,9 +36,10 @@ class ValidatorServiceMissingHeadersE2eTests {
                 mapper = mapper,
             )
 
-            missingHeadersConsumer = runService(validatorOutputConsumerConfig(MissingHeadersPayload::class.java)) {
-                it.originalMessage.officeId.toString()
-            }
+            missingHeadersConsumer = runService(
+                cfg = validatorOutputConsumerConfig(MissingHeadersPayload::class.java),
+                keySelector = { it.originalMessage.officeId.toString() },
+            )
             missingHeadersConsumer.start()
         }
 

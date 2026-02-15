@@ -42,7 +42,10 @@ class ValidatorServiceE2eTests {
                 mapper = mapper,
             )
 
-            consumer = runService(validatorOutputConsumerConfig(ValidatedPayload::class.java)) { it.officeId.toString() }
+            consumer = runService(
+                cfg = validatorOutputConsumerConfig(ValidatedPayload::class.java),
+                keySelector = { it.officeId.toString() },
+            )
             consumer.start()
         }
 

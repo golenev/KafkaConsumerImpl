@@ -47,10 +47,16 @@ class ValidatorServiceBatchedOutputE2eTests {
                 mapper = mapper,
             )
 
-            batchedConsumer = runService(validatorBatchedOutputConsumerConfig(ValidatedPayload::class.java)) { it.officeId.toString() }
+            batchedConsumer = runService(
+                cfg = validatorBatchedOutputConsumerConfig(ValidatedPayload::class.java),
+                keySelector = { it.officeId.toString() },
+            )
             batchedConsumer.start()
 
-            missingHeadersConsumer = runService(validatorBatchedErrorConsumerConfig(MissingHeadersPayload::class.java)) { it.originalMessage.officeId.toString() }
+            missingHeadersConsumer = runService(
+                cfg = validatorBatchedErrorConsumerConfig(MissingHeadersPayload::class.java),
+                keySelector = { it.originalMessage.officeId.toString() },
+            )
             missingHeadersConsumer.start()
         }
 
@@ -240,40 +246,6 @@ class ValidatorServiceBatchedOutputE2eTests {
 
         step("Проверить что из двух дубликатов обработался только один") {
             records.filter { it.value.eventId == eventId }.shouldHaveSize(1)
-        }
-    }
-
-    @Test
-    @DisplayName("Проверка, что при отсутствии заголовков сообщение уходит в output с ошибкой, даже если ключ withBatch")
-    fun `payload without headers is forwarded as error json with original message even with batch key`() {
-        val officeId = Random.nextLong(1, Long.MAX_VALUE)
-        val eventId = UUID.randomUUID().toString()
-
-        val payload = ValidationPayload(
-            eventId = eventId,
-            userId = "user-${UUID.randomUUID()}",
-            officeId = officeId,
-            typeAction = 100,
-            status = "NEW",
-            sourceSystem = "validator-e2e",
-            priority = 3,
-            amount = BigDecimal("42.00"),
-        )
-
-        step("Отправить сообщение без заголовков и с ключом withBatch") {
-            producer.sendMessageToKafka(BATCH_KEY, payload, emptyMap())
-        }
-
-        val records = step("Дождаться сообщения об ошибке в обычном output-топике") {
-            missingHeadersConsumer.waitForKeyList(officeId.toString(), timeoutMs = 30_000, min = 1, max = 1)
-        }
-
-        step("Проверить структуру и содержимое JSON при отсутствии заголовков") {
-            records.shouldHaveSize(1)
-            val response = records.first()
-            response.message shouldBe "Kafka message does not contain headers"
-            response.originalMessage.eventId shouldBe eventId
-            response.originalMessage.officeId shouldBe officeId
         }
     }
 }
